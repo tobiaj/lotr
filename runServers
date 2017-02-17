@@ -1,0 +1,5 @@
+osascript -e 'tell application "Terminal" to do script "java -jar /Users/tobiaj/Documents/intellij/Distributed-systems-and-algorithms/id2203project17-master/server/target/project17-server-1.0-SNAPSHOT-shaded.jar -p 45678"'
+osascript -e 'tell application "Terminal" to do script "java -jar /Users/tobiaj/Documents/intellij/Distributed-systems-and-algorithms/id2203project17-master/server/target/project17-server-1.0-SNAPSHOT-shaded.jar -p 56789 -c localhost:45678"'
+osascript -e 'tell application "Terminal" to do script "java -jar /Users/tobiaj/Documents/intellij/Distributed-systems-and-algorithms/id2203project17-master/server/target/project17-server-1.0-SNAPSHOT-shaded.jar -p 56799 -c localhost:45678"'
+sleep 15
+osascript -e 'tell application "Terminal" to do script "java -jar /Users/tobiaj/Documents/intellij/Distributed-systems-and-algorithms/id2203project17-master/client/target/project17-client-1.0-SNAPSHOT-shaded.jar -p 56787 -b localhost:45678"'
