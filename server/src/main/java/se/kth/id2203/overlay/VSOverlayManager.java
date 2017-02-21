@@ -79,8 +79,8 @@ public class VSOverlayManager extends ComponentDefinition {
         public void handle(Booted event) {
             if (event.assignment instanceof LookupTable) {
                 LOG.info("Got NodeAssignment, overlay ready.");
-                LOG.info("TO STRING IN OVERLAY: " + lut.toString() + " \n AND I AM:  "+ self);
                 lut = (LookupTable) event.assignment;
+                LOG.info("TO STRING IN OVERLAY: " + lut.toString() + " \n AND I AM:  "+ self);
             } else {
                 LOG.error("Got invalid NodeAssignment type. Expected: LookupTable; Got: {}", event.assignment.getClass());
             }

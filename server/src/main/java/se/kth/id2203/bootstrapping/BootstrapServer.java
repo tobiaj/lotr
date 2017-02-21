@@ -108,7 +108,7 @@ public class BootstrapServer extends ComponentDefinition {
                     //trigger(new Booted(initialAssignment), boot);
 
                     ready = new HashSet<>();
-
+                    //initialAssignment = null;
                     state = State.COLLECTING;
                 }
             } else if (state == State.DONE) {
@@ -126,6 +126,7 @@ public class BootstrapServer extends ComponentDefinition {
                 trigger(new Message(self, node, new Boot(initialAssignment)), net);
             }
 
+            //initialAssignment = null;
             active = new HashSet<>();
             //ready.add(self);
         }
@@ -173,6 +174,7 @@ public class BootstrapServer extends ComponentDefinition {
         }
 
         trigger(new GetInitialAssignments(ImmutableSet.copyOf(createGroup), counter), boot);
+        createGroup = new HashSet<>();
         counter++;
     }
 
