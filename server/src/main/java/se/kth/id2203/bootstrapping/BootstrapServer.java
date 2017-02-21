@@ -32,6 +32,7 @@ import org.slf4j.LoggerFactory;
 import se.kth.id2203.bootstrapping.BootstrapServer.State;
 import se.kth.id2203.networking.Message;
 import se.kth.id2203.networking.NetAddress;
+import se.kth.id2203.overlay.LookupTable;
 import se.sics.kompics.ClassMatchedHandler;
 import se.sics.kompics.ComponentDefinition;
 import se.sics.kompics.Handler;
@@ -59,6 +60,7 @@ public class BootstrapServer extends ComponentDefinition {
     private Set<NetAddress> active = new HashSet<>();
     private Set<NetAddress> ready = new HashSet<>();
     private Set<NetAddress> createGroup = new HashSet<>();
+    private LookupTable lut = new LookupTable();
     private int counter = 0;
 
     private NodeAssignment initialAssignment = null;
@@ -81,6 +83,21 @@ public class BootstrapServer extends ComponentDefinition {
             if (state == State.COLLECTING) {
                 LOG.info("{} hosts in active set.", active.size());
                 if (active.size() >= bootThreshold) {
+
+                    if (counter == 0) {
+                        lut = lut.generate(ImmutableSet.copyOf(active), counter);
+                    }
+                    else {
+                        if (lut.addToExisting(ImmutableSet.copyOf(active), counter, lut)) {
+                            LOG.info("SUCCEEDED!!!!!!!! WITH COUNTER:  " + counter);
+                        }
+                        else{
+                            LOG.info("NOT SUCCEEDED!!!!!!!");
+                        }
+                    }
+
+                    LOG.info("LOOKUPTABLE TO STRING " + lut.toString());
+
                     bootUp();
                 }
             } else if (state == State.SEEDING) {
@@ -89,6 +106,8 @@ public class BootstrapServer extends ComponentDefinition {
                     LOG.info("Finished seeding. Bootstrapping complete.");
                     LOG.debug("InitalAssignment in seeding when threshold is max: " + initialAssignment);
                     //trigger(new Booted(initialAssignment), boot);
+
+                    ready = new HashSet<>();
 
                     state = State.COLLECTING;
                 }

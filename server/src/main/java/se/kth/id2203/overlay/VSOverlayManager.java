@@ -61,14 +61,14 @@ public class VSOverlayManager extends ComponentDefinition {
     protected final Positive<Timer> timer = requires(Timer.class);
     //******* Fields ******
     final NetAddress self = config().getValue("id2203.project.address", NetAddress.class);
-    private LookupTable lut = null;
+    private LookupTable lut = new LookupTable();
     //******* Handlers ******
     protected final Handler<GetInitialAssignments> initialAssignmentHandler = new Handler<GetInitialAssignments>() {
 
         @Override
         public void handle(GetInitialAssignments event) {
             LOG.info("Generating LookupTable...");
-            LookupTable lut = LookupTable.generate(event.nodes);
+            lut = lut.generate(event.nodes, 0);
             LOG.debug("Generated assignments:\n{}", lut);
             trigger(new InitialAssignments(lut), boot);
         }
@@ -79,6 +79,7 @@ public class VSOverlayManager extends ComponentDefinition {
         public void handle(Booted event) {
             if (event.assignment instanceof LookupTable) {
                 LOG.info("Got NodeAssignment, overlay ready.");
+                LOG.info("TO STRING IN OVERLAY: " + lut.toString() + " \n AND I AM:  "+ self);
                 lut = (LookupTable) event.assignment;
             } else {
                 LOG.error("Got invalid NodeAssignment type. Expected: LookupTable; Got: {}", event.assignment.getClass());

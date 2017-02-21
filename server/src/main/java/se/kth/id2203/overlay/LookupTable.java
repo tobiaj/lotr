@@ -67,10 +67,15 @@ public class LookupTable implements NodeAssignment {
         return sb.toString();
     }
 
-    static LookupTable generate(ImmutableSet<NetAddress> nodes) {
+    public LookupTable generate(ImmutableSet<NetAddress> nodes, int counter) {
         LookupTable lut = new LookupTable();
-        lut.partitions.putAll(0, nodes);
+        lut.partitions.putAll(counter, nodes);
         return lut;
+    }
+
+    public boolean addToExisting(ImmutableSet<NetAddress> nodes, int counter, LookupTable lookupTable){
+
+        return lookupTable.partitions.putAll(counter, nodes);
     }
 
 }
