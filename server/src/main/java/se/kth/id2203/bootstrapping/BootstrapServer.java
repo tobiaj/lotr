@@ -42,6 +42,7 @@ import se.sics.kompics.network.Network;
 import se.sics.kompics.timer.CancelPeriodicTimeout;
 import se.sics.kompics.timer.SchedulePeriodicTimeout;
 import se.sics.kompics.timer.Timer;
+import sun.nio.ch.Net;
 
 public class BootstrapServer extends ComponentDefinition {
 
@@ -55,8 +56,11 @@ public class BootstrapServer extends ComponentDefinition {
     final int bootThreshold = config().getValue("id2203.project.bootThreshold", Integer.class);
     private State state = State.COLLECTING;
     private UUID timeoutId;
-    private final Set<NetAddress> active = new HashSet<>();
-    private final Set<NetAddress> ready = new HashSet<>();
+    private Set<NetAddress> active = new HashSet<>();
+    private Set<NetAddress> ready = new HashSet<>();
+    private Set<NetAddress> createGroup = new HashSet<>();
+    private int counter = 0;
+
     private NodeAssignment initialAssignment = null;
     //******* Handlers ******
     protected final Handler<Start> startHandler = new Handler<Start>() {
@@ -68,7 +72,7 @@ public class BootstrapServer extends ComponentDefinition {
             spt.setTimeoutEvent(new BSTimeout(spt));
             trigger(spt, timer);
             timeoutId = spt.getTimeoutEvent().getTimeoutId();
-            active.add(self);
+            //active.add(self);
         }
     };
     protected final Handler<BSTimeout> timeoutHandler = new Handler<BSTimeout>() {
@@ -84,8 +88,9 @@ public class BootstrapServer extends ComponentDefinition {
                 if (ready.size() >= bootThreshold) {
                     LOG.info("Finished seeding. Bootstrapping complete.");
                     LOG.debug("InitalAssignment in seeding when threshold is max: " + initialAssignment);
-                    trigger(new Booted(initialAssignment), boot);
-                    state = State.DONE;
+                    //trigger(new Booted(initialAssignment), boot);
+
+                    state = State.COLLECTING;
                 }
             } else if (state == State.DONE) {
                 //suicide();
@@ -101,7 +106,9 @@ public class BootstrapServer extends ComponentDefinition {
             for (NetAddress node : active) {
                 trigger(new Message(self, node, new Boot(initialAssignment)), net);
             }
-            ready.add(self);
+
+            active = new HashSet<>();
+            //ready.add(self);
         }
     };
     protected final ClassMatchedHandler<CheckIn, Message> checkinHandler = new ClassMatchedHandler<CheckIn, Message>() {
@@ -135,7 +142,19 @@ public class BootstrapServer extends ComponentDefinition {
     private void bootUp() {
         LOG.info("Threshold reached. Generating assignments...");
         state = State.SEEDING;
-        trigger(new GetInitialAssignments(ImmutableSet.copyOf(active)), boot);
+
+        int i = 0;
+        for (NetAddress address : active) {
+            if (i < 3) {
+                if (address != self) {
+                    createGroup.add(address);
+                    i++;
+                }
+            }
+        }
+
+        trigger(new GetInitialAssignments(ImmutableSet.copyOf(createGroup), counter), boot);
+        counter++;
     }
 
     static enum State {
