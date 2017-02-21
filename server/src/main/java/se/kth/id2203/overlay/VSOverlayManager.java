@@ -40,6 +40,7 @@ import se.sics.kompics.Negative;
 import se.sics.kompics.Positive;
 import se.sics.kompics.network.Network;
 import se.sics.kompics.timer.Timer;
+import sun.nio.ch.Net;
 
 /**
  * The V(ery)S(imple)OverlayManager.
@@ -61,7 +62,11 @@ public class VSOverlayManager extends ComponentDefinition {
     protected final Positive<Timer> timer = requires(Timer.class);
     //******* Fields ******
     final NetAddress self = config().getValue("id2203.project.address", NetAddress.class);
+
+    //******* Changes ******
     private LookupTable lut = new LookupTable();
+    private boolean leader = false;
+
     //******* Handlers ******
     protected final Handler<GetInitialAssignments> initialAssignmentHandler = new Handler<GetInitialAssignments>() {
 
@@ -80,7 +85,17 @@ public class VSOverlayManager extends ComponentDefinition {
             if (event.assignment instanceof LookupTable) {
                 LOG.info("Got NodeAssignment, overlay ready.");
                 lut = (LookupTable) event.assignment;
-                LOG.info("TO STRING IN OVERLAY: " + lut.toString() + " \n AND I AM:  "+ self);
+
+                for (NetAddress address : lut.getNodes()){
+                    if (address.equals(self)){
+                        leader = true;
+                    }
+                    break;
+                }
+
+                LOG.info("TO STRING IN OVERLAY: " + lut.toString() + " \n AND I AM:  "+ self +
+                        " \n I AM LEADER: " + leader);
+
             } else {
                 LOG.error("Got invalid NodeAssignment type. Expected: LookupTable; Got: {}", event.assignment.getClass());
             }
