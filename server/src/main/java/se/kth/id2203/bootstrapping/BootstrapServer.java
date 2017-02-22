@@ -29,10 +29,11 @@ import java.util.Set;
 import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import se.kth.id2203.bootstrapping.BootstrapServer.State;
 import se.kth.id2203.networking.Message;
 import se.kth.id2203.networking.NetAddress;
 import se.kth.id2203.overlay.LookupTable;
+import se.kth.id2203.supervisor.StartSupervisor;
+import se.kth.id2203.supervisor.SupervisorPort;
 import se.sics.kompics.ClassMatchedHandler;
 import se.sics.kompics.ComponentDefinition;
 import se.sics.kompics.Handler;
@@ -43,13 +44,15 @@ import se.sics.kompics.network.Network;
 import se.sics.kompics.timer.CancelPeriodicTimeout;
 import se.sics.kompics.timer.SchedulePeriodicTimeout;
 import se.sics.kompics.timer.Timer;
-import sun.nio.ch.Net;
 
 public class BootstrapServer extends ComponentDefinition {
 
     final static Logger LOG = LoggerFactory.getLogger(BootstrapServer.class);
     //******* Ports ******
     protected final Negative<Bootstrapping> boot = provides(Bootstrapping.class);
+
+    protected final Negative<SupervisorPort> supervisorPortNegative = provides(SupervisorPort.class);
+
     protected final Positive<Network> net = requires(Network.class);
     protected final Positive<Timer> timer = requires(Timer.class);
     //******* Fields ******
@@ -109,6 +112,11 @@ public class BootstrapServer extends ComponentDefinition {
 
                     ready = new HashSet<>();
                     //initialAssignment = null;
+
+                    if(counter == 2){
+                        LOG.info("TRIGGER THE SUPERVISOR");
+                        trigger(new StartSupervisor(lut), supervisorPortNegative);
+                    }
                     state = State.COLLECTING;
                 }
             } else if (state == State.DONE) {

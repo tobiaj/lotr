@@ -56,7 +56,6 @@ public class VSOverlayManager extends ComponentDefinition {
 
     final static Logger LOG = LoggerFactory.getLogger(VSOverlayManager.class);
     //******* Ports ******
-    protected final Negative<Routing> route = provides(Routing.class);
     protected final Positive<Bootstrapping> boot = requires(Bootstrapping.class);
     protected final Positive<Network> net = requires(Network.class);
     protected final Positive<Timer> timer = requires(Timer.class);
@@ -101,26 +100,6 @@ public class VSOverlayManager extends ComponentDefinition {
             }
         }
     };
-    protected final ClassMatchedHandler<RouteMsg, Message> routeHandler = new ClassMatchedHandler<RouteMsg, Message>() {
-
-        @Override
-        public void handle(RouteMsg content, Message context) {
-            Collection<NetAddress> partition = lut.lookup(content.key);
-            NetAddress target = J6.randomElement(partition);
-            LOG.info("Forwarding message for key {} to {}", content.key, target);
-            trigger(new Message(context.getSource(), target, content.msg), net);
-        }
-    };
-    protected final Handler<RouteMsg> localRouteHandler = new Handler<RouteMsg>() {
-
-        @Override
-        public void handle(RouteMsg event) {
-            Collection<NetAddress> partition = lut.lookup(event.key);
-            NetAddress target = J6.randomElement(partition);
-            LOG.info("Routing message for key {} to {}", event.key, target);
-            trigger(new Message(self, target, event.msg), net);
-        }
-    };
     protected final ClassMatchedHandler<Connect, Message> connectHandler = new ClassMatchedHandler<Connect, Message>() {
 
         @Override
@@ -138,8 +117,6 @@ public class VSOverlayManager extends ComponentDefinition {
     {
         subscribe(initialAssignmentHandler, boot);
         subscribe(bootHandler, boot);
-        subscribe(routeHandler, net);
-        subscribe(localRouteHandler, route);
         subscribe(connectHandler, net);
     }
 }
