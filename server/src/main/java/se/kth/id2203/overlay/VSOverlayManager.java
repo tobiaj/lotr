@@ -25,20 +25,19 @@ package se.kth.id2203.overlay;
 
 import com.larskroll.common.J6;
 import java.util.Collection;
+import java.util.UUID;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import se.kth.id2203.bootstrapping.Booted;
-import se.kth.id2203.bootstrapping.Bootstrapping;
-import se.kth.id2203.bootstrapping.GetInitialAssignments;
-import se.kth.id2203.bootstrapping.InitialAssignments;
+import se.kth.id2203.bootstrapping.*;
+import se.kth.id2203.heartbeat.HeartBeat;
+import se.kth.id2203.heartbeat.HeartbeatPort;
+import se.kth.id2203.heartbeat.HeartbeatResponse;
 import se.kth.id2203.networking.Message;
 import se.kth.id2203.networking.NetAddress;
-import se.sics.kompics.ClassMatchedHandler;
-import se.sics.kompics.ComponentDefinition;
-import se.sics.kompics.Handler;
-import se.sics.kompics.Negative;
-import se.sics.kompics.Positive;
+import se.sics.kompics.*;
 import se.sics.kompics.network.Network;
+import se.sics.kompics.timer.SchedulePeriodicTimeout;
 import se.sics.kompics.timer.Timer;
 import sun.nio.ch.Net;
 
@@ -59,64 +58,120 @@ public class VSOverlayManager extends ComponentDefinition {
     protected final Positive<Bootstrapping> boot = requires(Bootstrapping.class);
     protected final Positive<Network> net = requires(Network.class);
     protected final Positive<Timer> timer = requires(Timer.class);
+
+    protected final Negative<HeartbeatPort> heartbeatSend = provides(HeartbeatPort.class);
+
+    protected final Positive<HeartbeatPort> hearbeatReceive = requires(HeartbeatPort.class);
+
     //******* Fields ******
     final NetAddress self = config().getValue("id2203.project.address", NetAddress.class);
 
     //******* Changes ******
     private LookupTable lut = new LookupTable();
     private boolean leader = false;
+    private UUID timeoutId;
+    private NetAddress addressToleader;
+    private boolean leaderAlive;
+
 
     //******* Handlers ******
-    protected final Handler<GetInitialAssignments> initialAssignmentHandler = new Handler<GetInitialAssignments>() {
+
+    /*
+
+    protected final Handler<Start> startHandler = new Handler<Start>() {
 
         @Override
-        public void handle(GetInitialAssignments event) {
-            LOG.info("Generating LookupTable...");
-            lut = lut.generate(event.nodes, 0);
-            LOG.debug("Generated assignments:\n{}", lut);
-            trigger(new InitialAssignments(lut), boot);
+        public void handle(Start event) {
+            long timeout = (config().getValue("id2203.project.keepAlivePeriod", Long.class) * 2);
+            SchedulePeriodicTimeout spt = new SchedulePeriodicTimeout(timeout, timeout);
+            spt.setTimeoutEvent(new BSTimeout(spt));
+            trigger(spt, timer);
+            timeoutId = spt.getTimeoutEvent().getTimeoutId();
         }
     };
-    protected final Handler<Booted> bootHandler = new Handler<Booted>() {
+
+    protected final Handler<BSTimeout> timeoutHandler = new Handler<BSTimeout>() {
 
         @Override
-        public void handle(Booted event) {
-            if (event.assignment instanceof LookupTable) {
-                LOG.info("Got NodeAssignment, overlay ready.");
-                lut = (LookupTable) event.assignment;
+        public void handle(BSTimeout e) {
 
-                for (NetAddress address : lut.getNodes()){
-                    if (address.equals(self)){
-                        leader = true;
-                    }
-                    break;
+            if(!leader) {
+                    LOG.debug("Not leader, i am " + self + " sending heartbeat to leader " );
+                    trigger(new HeartBeat(leaderAlive), hearbeatPort);
                 }
-
-                LOG.info("TO STRING IN OVERLAY: " + lut.toString() + " \n AND I AM:  "+ self +
-                        " \n I AM LEADER: " + leader);
-
-            } else {
-                LOG.error("Got invalid NodeAssignment type. Expected: LookupTable; Got: {}", event.assignment.getClass());
             }
-        }
-    };
-    protected final ClassMatchedHandler<Connect, Message> connectHandler = new ClassMatchedHandler<Connect, Message>() {
+        };
+        */
 
-        @Override
-        public void handle(Connect content, Message context) {
-            if (lut != null) {
-                LOG.debug("Accepting connection request from {}", context.getSource());
-                int size = lut.getNodes().size();
-                trigger(new Message(self, context.getSource(), content.ack(size)), net);
-            } else {
-                LOG.info("Rejecting connection request from {}, as system is not ready, yet.", context.getSource());
+
+        protected final Handler<GetInitialAssignments> initialAssignmentHandler = new Handler<GetInitialAssignments>() {
+
+            @Override
+            public void handle(GetInitialAssignments event) {
+                LOG.info("Generating LookupTable...");
+                lut = lut.generate(event.nodes, 0);
+                LOG.debug("Generated assignments:\n{}", lut);
+                trigger(new InitialAssignments(lut), boot);
             }
-        }
-    };
+        };
+        protected final Handler<Booted> bootHandler = new Handler<Booted>() {
 
-    {
-        subscribe(initialAssignmentHandler, boot);
-        subscribe(bootHandler, boot);
-        subscribe(connectHandler, net);
+            @Override
+            public void handle(Booted event) {
+                if (event.assignment instanceof LookupTable) {
+                    LOG.info("Got NodeAssignment, overlay ready.");
+                    lut = (LookupTable) event.assignment;
+
+                    for (NetAddress address : lut.getNodes()){
+                        if (address.equals(self)){
+                            leader = true;
+                            LOG.info("TO STRING IN OVERLAY: " + lut.toString() + " \n AND I AM:  "+ self +
+                                    " \n I AM LEADER: " + leader);
+                        }
+                        else {
+                            addressToleader = address;
+                            LOG.info("TO STRING IN OVERLAY: " + lut.toString() + " \n AND I AM:  "+ self +
+                                    " \n I Have leader status : " + leader  + " my leader is: " + addressToleader);
+                        }
+                        break;
+                    }
+
+                } else {
+                    LOG.error("Got invalid NodeAssignment type. Expected: LookupTable; Got: {}", event.assignment.getClass());
+                }
+            }
+        };
+        protected final ClassMatchedHandler<Connect, Message> connectHandler = new ClassMatchedHandler<Connect, Message>() {
+
+            @Override
+            public void handle(Connect content, Message context) {
+                if (lut != null) {
+                    LOG.debug("Accepting connection request from {}", context.getSource());
+                    int size = lut.getNodes().size();
+                    trigger(new Message(self, context.getSource(), content.ack(size)), net);
+                } else {
+                    LOG.info("Rejecting connection request from {}, as system is not ready, yet.", context.getSource());
+                }
+            }
+        };
+
+        protected final ClassMatchedHandler<HeartBeat, Message> heartBeatHandler = new ClassMatchedHandler<HeartBeat, Message>() {
+            @Override
+            public void handle(HeartBeat heartBeat, Message message) {
+                if (leader){
+                    LOG.info("I am: " + self + " \n i am leader " +   leader + " got message from SUPERVISOR");
+                    trigger(new Message(self, message.getSource(), new HeartbeatResponse(true, self)), net);
+                }
+            }
+        };
+
+
+        {
+            subscribe(initialAssignmentHandler, boot);
+            subscribe(bootHandler, boot);
+            subscribe(connectHandler, net);
+            subscribe(heartBeatHandler, net);
+            //subscribe(startHandler, control);
+
+        }
     }
-}

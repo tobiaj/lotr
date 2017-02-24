@@ -38,7 +38,16 @@ public class LookupTable implements NodeAssignment {
 
     private static final long serialVersionUID = -8766981433378303267L;
 
+    public TreeMultimap<Integer, NetAddress> getPartitions() {
+        return partitions;
+    }
+
     private final TreeMultimap<Integer, NetAddress> partitions = TreeMultimap.create();
+
+    public int getNumberOfGroups() {
+       return partitions.keySet().size();
+    }
+
 
     public Collection<NetAddress> lookup(String key) {
         int keyHash = key.hashCode();
@@ -74,7 +83,6 @@ public class LookupTable implements NodeAssignment {
     }
 
     public boolean addToExisting(ImmutableSet<NetAddress> nodes, int counter, LookupTable lookupTable){
-
         return lookupTable.partitions.putAll(counter, nodes);
     }
 
