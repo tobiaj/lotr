@@ -4,7 +4,8 @@ import com.google.common.base.Optional;
 import se.kth.id2203.bootstrapping.BootstrapClient;
 import se.kth.id2203.bootstrapping.BootstrapServer;
 import se.kth.id2203.bootstrapping.Bootstrapping;
-import se.kth.id2203.heartbeat.HeartbeatPort;
+import se.kth.id2203.failureDetector.FailureDetector;
+import se.kth.id2203.failureDetector.FailurePort;
 import se.kth.id2203.kvstore.KVService;
 import se.kth.id2203.networking.NetAddress;
 import se.kth.id2203.supervisor.Supervisor;
@@ -31,6 +32,7 @@ public class ParentComponent
 
     //******* Changes ******
     protected final Component supervisor = create(Supervisor.class, Init.NONE);
+    protected final Component failureDetector = create(FailureDetector.class, Init.NONE);
 
 
 
@@ -56,8 +58,13 @@ public class ParentComponent
 
         //Changes
         connect(net, supervisor.getNegative(Network.class), Channel.TWO_WAY);
-        connect(timer, supervisor.getNegative(Timer.class), Channel.TWO_WAY);
-        connect(supervisor.getPositive(HeartbeatPort.class), overlay.getNegative(HeartbeatPort.class), Channel.TWO_WAY);
+        connect(net, failureDetector.getNegative(Network.class), Channel.TWO_WAY);
+        connect(timer, failureDetector.getNegative(Timer.class), Channel.TWO_WAY);
+
+        //connect(supervisor.getPositive(FailurePort.class), overlay.getNegative(FailurePort.class), Channel.TWO_WAY);
+
+        connect(supervisor.getPositive(FailurePort.class), failureDetector.getNegative(FailurePort.class), Channel.TWO_WAY);
+        connect(overlay.getPositive(FailurePort.class), failureDetector.getNegative(FailurePort.class), Channel.TWO_WAY);
 
     }
 }

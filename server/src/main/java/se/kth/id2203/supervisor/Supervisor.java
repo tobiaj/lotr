@@ -1,14 +1,13 @@
 package se.kth.id2203.supervisor;
 
-import com.google.common.collect.TreeMultimap;
-import com.google.common.primitives.UnsignedInteger;
+import com.google.common.collect.ImmutableSet;
 import com.larskroll.common.J6;
+import com.sun.org.apache.xpath.internal.operations.Neg;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import se.kth.id2203.bootstrapping.BSTimeout;
-import se.kth.id2203.heartbeat.HeartBeat;
-import se.kth.id2203.heartbeat.HeartbeatPort;
-import se.kth.id2203.heartbeat.HeartbeatResponse;
+import se.kth.id2203.failureDetector.FailurePort;
+import se.kth.id2203.failureDetector.StartFailureDetector;
 import se.kth.id2203.networking.Message;
 import se.kth.id2203.networking.NetAddress;
 import se.kth.id2203.overlay.LookupTable;
@@ -34,42 +33,21 @@ public class Supervisor extends ComponentDefinition{
     protected final Positive<Network> net = requires(Network.class);
     protected final Positive<Timer> timer = requires(Timer.class);
 
-    protected final Negative<HeartbeatPort> heartbeatPort = provides(HeartbeatPort.class);
-    protected final Positive<HeartbeatPort> heartbeatReceive = requires(HeartbeatPort.class);
-
     protected final Positive<SupervisorPort> supervisor = requires(SupervisorPort.class);
+    protected final Negative<FailurePort> failure = provides(FailurePort.class);
 
     //******* Fields ******
     final NetAddress self = config().getValue("id2203.project.address", NetAddress.class);
 
     private LookupTable lut;
     private HashMap<Integer, Range> keysToGroups = new HashMap<>();
-    private HashSet<NetAddress> overlayLeaders = new HashSet<>();
+    private HashSet<NetAddress> leaderNodes = new HashSet<>();
+    private int numberOfLeaders;
 
     private UUID timeoutId;
 
     //******* Handlers ******
 
-    protected final Handler<BSTimeout> timeoutHandler = new Handler<BSTimeout>() {
-
-        @Override
-        public void handle(BSTimeout e) {
-            if (overlayLeaders.isEmpty()){
-                for (NetAddress address : lut.getNodes()){
-                    LOG.info("I AM SUPERVISOR I GOT TIMEOUT SEDING TO OVERLAYS, TARGET IS " + address);
-                    trigger(new Message(self, address, new HeartBeat(address)), net);
-                }
-            }
-            else{
-
-                for (NetAddress address : overlayLeaders){
-                    LOG.info("I AM SUPERVISOR I GOT TIMEOUT SEDING TO OVERLAYS, TARGET IS " + address);
-                    trigger(new Message(self, address, new HeartBeat(address)), net);
-                }
-
-            }
-        }
-    };
 
     protected final ClassMatchedHandler<RouteMsg, Message> routeHandler = new ClassMatchedHandler<RouteMsg, Message>() {
 
@@ -104,40 +82,36 @@ public class Supervisor extends ComponentDefinition{
             LOG.info("I AM SUPERVISOR");
             lut = startSupervisor.getLookupTable();
             LOG.info("I GOT LOOKUPTABLE " + lut.toString());
+            numberOfLeaders = lut.getNumberOfGroups();
             createKeyRanges();
 
-            startHeartbeat();
+            getStartingLeaders();
 
+            startFailureDetector();
         }
     };
 
-    private void startHeartbeat() {
-        long timeout = (config().getValue("id2203.project.keepAlivePeriod", Long.class) * 2);
-        SchedulePeriodicTimeout spt = new SchedulePeriodicTimeout(timeout, timeout);
-        spt.setTimeoutEvent(new BSTimeout(spt));
-        trigger(spt, timer);
-        timeoutId = spt.getTimeoutEvent().getTimeoutId();
-    }
-
-
-    protected final ClassMatchedHandler<HeartbeatResponse, Message> heartBeatHandler = new ClassMatchedHandler<HeartbeatResponse, Message>() {
+    protected final ClassMatchedHandler<GetLeaders, Message> getLeadersResponse = new ClassMatchedHandler<GetLeaders, Message>() {
         @Override
-        public void handle(HeartbeatResponse heartbeatResponse, Message message) {
-            NetAddress sender = heartbeatResponse.getSender();
-            LOG.info("GOT HEARTBEAT FROM " + sender);
-            overlayLeaders.add(sender);
+        public void handle(GetLeaders getLeaders, Message message) {
+            LOG.info("SUPERVISOR GOT LEADER: " + message.getSource());
+            leaderNodes.add(message.getSource());
+            if (leaderNodes.size() == numberOfLeaders) {
+                startFailureDetector();
+            }
+
         }
     };
 
-    {
-        subscribe(routeHandler, net);
-        subscribe(localRouteHandler, route);
-        subscribe(startSupervisorHandler, supervisor);
-        subscribe(timeoutHandler, timer);
-        subscribe(heartBeatHandler, net);
-
+    private void getStartingLeaders() {
+        for (NetAddress address : lut.getNodes()){
+            trigger(new Message(self, address, new GetLeaders()), net);
+        }
     }
 
+    private void startFailureDetector() {
+        trigger(new StartFailureDetector(leaderNodes), failure);
+    }
 
     private void createKeyRanges(){
 
@@ -161,6 +135,15 @@ public class Supervisor extends ComponentDefinition{
             LOG.info(" Range min is " + range.getMin() + " and max is " + range.getMax());
         }
 
+
+    }
+
+
+    {
+        subscribe(routeHandler, net);
+        subscribe(localRouteHandler, route);
+        subscribe(startSupervisorHandler, supervisor);
+        subscribe(getLeadersResponse, net);
 
     }
 
