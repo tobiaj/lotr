@@ -24,12 +24,14 @@
 package se.kth.id2203.overlay;
 
 import java.util.HashSet;
+import java.util.Random;
 import java.util.UUID;
 
 import com.google.common.collect.ImmutableSet;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import se.kth.id2203.Broadcast.BEBPort;
+import se.kth.id2203.Broadcast.Broadcast;
 import se.kth.id2203.bootstrapping.*;
 import se.kth.id2203.failureDetector.FailureCheck;
 import se.kth.id2203.failureDetector.FailureCheckResponse;
@@ -144,6 +146,7 @@ public class VSOverlayManager extends ComponentDefinition {
             if (leader) {
                 LOG.info("I am: " + self + " \n i am LEADER " + leader + " GOT FAILURE CHECK FROM: " + message.getSource());
                 trigger(new Message(self, message.getSource(), new FailureCheckResponse(true, self)), net);
+                trigger(new Broadcast(new Random().nextInt(9), "simon", lut.getNodes()), beb);
             }
         }
     };

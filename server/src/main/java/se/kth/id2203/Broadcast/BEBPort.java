@@ -8,6 +8,6 @@ import se.sics.kompics.PortType;
 public class BEBPort extends PortType {
 
     {
-        request(Broadcast.class);
+        indication(Broadcast.class);
     }
 }

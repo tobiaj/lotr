@@ -41,6 +41,7 @@ public class BEB extends ComponentDefinition {
     {
         @Override
         public void handle(Broadcast broadcast) {
+            LOG.info("Key: " + broadcast.key + " Value: " + broadcast.value);
             initiateBroadcast(broadcast);
         }
     };
@@ -48,7 +49,7 @@ public class BEB extends ComponentDefinition {
     private void initiateBroadcast(Broadcast broadcast) {
 
         for (NetAddress node : nodes)
-            trigger(new Message(self, node, new Broadcast(broadcast.key, broadcast.value)), net);
+            trigger(new Message(self, node, new Broadcast(broadcast.key, broadcast.value, null)), net);
 
     }
 
