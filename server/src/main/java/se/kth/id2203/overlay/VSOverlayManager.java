@@ -24,23 +24,19 @@
 package se.kth.id2203.overlay;
 
 import java.util.HashSet;
+import java.util.LinkedList;
 import java.util.UUID;
 
-import com.google.common.collect.ImmutableSet;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import se.kth.id2203.bootstrapping.*;
-import se.kth.id2203.failureDetector.FailureCheck;
-import se.kth.id2203.failureDetector.FailureCheckResponse;
-import se.kth.id2203.failureDetector.FailurePort;
-import se.kth.id2203.failureDetector.StartFailureDetector;
+import se.kth.id2203.failureDetector.*;
 import se.kth.id2203.networking.Message;
 import se.kth.id2203.networking.NetAddress;
 import se.kth.id2203.supervisor.GetLeaders;
 import se.sics.kompics.*;
 import se.sics.kompics.network.Network;
 import se.sics.kompics.timer.Timer;
-import sun.nio.ch.Net;
 
 /**
  * The V(ery)S(imple)OverlayManager.
@@ -74,6 +70,7 @@ public class VSOverlayManager extends ComponentDefinition {
     private NetAddress supervisor;
     private HashSet<NetAddress> failureAddressToLeader = new HashSet<>();
     private boolean leaderAlive;
+    private LinkedList<NetAddress> nodesInGroup = new LinkedList<>();
 
 
     //******* Handlers ******
@@ -98,22 +95,24 @@ public class VSOverlayManager extends ComponentDefinition {
                 LOG.info("Got NodeAssignment, overlay ready.");
                 lut = (LookupTable) event.assignment;
 
-                for (NetAddress address : lut.getNodes()){
-                    if (address.equals(self)){
-                        leader = true;
-                        LOG.info("TO STRING IN OVERLAY: " + lut.toString() + " \n AND I AM:  "+ self +
-                                " \n I AM LEADER: " + leader);
+                for (NetAddress address : lut.getNodes()) {
+                    nodesInGroup.add(address);
 
-                    }
-                    else {
-                        addressToleader = address;
-                        failureAddressToLeader.add(address);
-                        LOG.info("TO STRING IN OVERLAY: " + lut.toString() + " \n AND I AM:  "+ self +
-                                " \n I Have leader status : " + leader  + " my leader is: " + addressToleader);
-                        trigger(new StartFailureDetector(failureAddressToLeader), failure);
+                }
 
-                    }
-                    break;
+                if (nodesInGroup.getFirst().equals(self)){
+                    leader = true;
+                    LOG.info("TO STRING IN OVERLAY: " + lut.toString() + " \n AND I AM:  "+ self +
+                            " \n I AM LEADER: " + leader);
+
+                }
+                else {
+                    addressToleader = nodesInGroup.getFirst();
+                    failureAddressToLeader.add(addressToleader);
+                    LOG.info("TO STRING IN OVERLAY: " + lut.toString() + " \n AND I AM:  "+ self +
+                            " \n I Have leader status : " + leader  + " my leader is: " + addressToleader);
+                    //trigger(new StartFailureDetector(failureAddressToLeader), failure);
+
                 }
 
             } else {
@@ -136,14 +135,22 @@ public class VSOverlayManager extends ComponentDefinition {
         }
     };
 
-
-    protected final ClassMatchedHandler<FailureCheck, Message> failureCheckHandler = new ClassMatchedHandler<FailureCheck, Message>() {
+    protected final ClassMatchedHandler<LeaderFailureCheck, Message> leaderFailureCheck = new ClassMatchedHandler<LeaderFailureCheck, Message>() {
         @Override
-        public void handle(FailureCheck failureCheck, Message message) {
+        public void handle(LeaderFailureCheck leaderFailureCheck, Message message) {
+            //To be safe
             if (leader){
-                LOG.info("I am: " + self + " \n i am LEADER " +   leader + " GOT FAILURE CHECK FROM: " + message.getSource());
-                trigger(new Message(self, message.getSource(), new FailureCheckResponse(true, self)), net);
+                LOG.info("LEADER GOT FAILURE CHECK FROM: " + message.getSource());
+                trigger(new Message(self, message.getSource(), new LeaderFailureCheckResponse(true, self)), net);
             }
+        }
+    };
+
+    protected final ClassMatchedHandler<PassiveFailureCheck, Message> passiveFailureCheck = new ClassMatchedHandler<PassiveFailureCheck, Message>() {
+        @Override
+        public void handle(PassiveFailureCheck passiveFailureCheck, Message message) {
+            LOG.info("PASSIVE GOT FAILURE CHECK FROM: " + message.getSource());
+            trigger(new Message(self, message.getSource(), new PassiveFailureCheckResponse(true, self)), net);
         }
     };
 
@@ -165,7 +172,8 @@ public class VSOverlayManager extends ComponentDefinition {
         subscribe(initialAssignmentHandler, boot);
         subscribe(bootHandler, boot);
         subscribe(connectHandler, net);
-        subscribe(failureCheckHandler, net);
+        subscribe(leaderFailureCheck, net);
+        subscribe(passiveFailureCheck, net);
         subscribe(getLeaders, net);
 
     }

@@ -11,13 +11,22 @@ import java.util.HashSet;
  */
 public class StartFailureDetector implements KompicsEvent{
 
-    public HashSet<NetAddress> getNodes() {
-        return nodes;
+
+    public HashSet<NetAddress> getLeaderNodes() {
+        return leaderNodes;
     }
 
-    private HashSet<NetAddress> nodes;
+    public HashSet<NetAddress> getPassiveNodes() {
+        return passiveNodes;
+    }
 
-    public StartFailureDetector(HashSet<NetAddress> nodes){
-        this.nodes = nodes;
+    private HashSet<NetAddress> leaderNodes;
+    private HashSet<NetAddress> passiveNodes;
+
+    public StartFailureDetector(HashSet<NetAddress> leaderNodes, HashSet<NetAddress> passiveNodes){
+
+        this.leaderNodes = leaderNodes;
+        this.passiveNodes = passiveNodes;
+
     }
 }

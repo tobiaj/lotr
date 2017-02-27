@@ -8,7 +8,7 @@ import java.io.Serializable;
 /**
  * Created by tobiaj on 2017-02-23.
  */
-public class FailureCheckResponse implements KompicsEvent, Serializable{
+public class LeaderFailureCheckResponse implements KompicsEvent, Serializable{
 
     public boolean isAlive() {
         return alive;
@@ -21,7 +21,7 @@ public class FailureCheckResponse implements KompicsEvent, Serializable{
     boolean alive;
     NetAddress sender;
 
-    public FailureCheckResponse(boolean alive, NetAddress sender){
+    public LeaderFailureCheckResponse(boolean alive, NetAddress sender){
         this.alive = alive;
         this.sender = sender;
     }

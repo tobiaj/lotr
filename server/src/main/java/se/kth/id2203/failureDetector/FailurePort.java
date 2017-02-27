@@ -8,7 +8,8 @@ import se.sics.kompics.PortType;
 public class FailurePort extends PortType {
 
     {
-        indication(FailureCheck.class);
+        indication(LeaderFailureCheck.class);
+        indication(PassiveFailureCheck.class);
         indication(StartFailureDetector.class);
         //indication(HeartbeatResponse.class);
     }

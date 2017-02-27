@@ -5,7 +5,6 @@ import org.slf4j.LoggerFactory;
 import se.kth.id2203.bootstrapping.BSTimeout;
 import se.kth.id2203.networking.Message;
 import se.kth.id2203.networking.NetAddress;
-import se.kth.id2203.overlay.LookupTable;
 import se.sics.kompics.*;
 import se.sics.kompics.network.Network;
 import se.sics.kompics.timer.SchedulePeriodicTimeout;
@@ -30,9 +29,14 @@ public class FailureDetector extends ComponentDefinition {
     //******* Fields ******
     final NetAddress self = config().getValue("id2203.project.address", NetAddress.class);
 
-    private HashSet<NetAddress> nodes;
-    private HashSet<NetAddress> active = new HashSet<>();
-    private HashSet<NetAddress> suspects = new HashSet<>();
+    private HashSet<NetAddress> leadernodes;
+    private HashSet<NetAddress> passivenodes;
+    private HashSet<NetAddress> leaderActive = new HashSet<>();
+    private HashSet<NetAddress> passiveActive = new HashSet<>();
+    private HashSet<NetAddress> leaderSuspects = new HashSet<>();
+    private HashSet<NetAddress> passiveSuspects = new HashSet<>();
+
+    private long delay = 2000;
 
     private UUID timeoutId;
 
@@ -42,46 +46,52 @@ public class FailureDetector extends ComponentDefinition {
 
         @Override
         public void handle(BSTimeout e) {
-            if (active.isEmpty()){
-                LOG.info("Failure detector sending out check FIRST TIME MY NODES ARE " + nodes.toString());
-                for (NetAddress address : nodes){
-                    trigger(new Message(self, address, new FailureCheck(address)), net);
-                }
-            }
-            else{
-                LOG.info("Failure detector sending out check TO ONLY ACTIVE LEADERS");
-                for (NetAddress address : active){
-                    trigger(new Message(self, address, new FailureCheck(address)), net);
-                }
 
-            }
+            checkLeaders();
+
+            checkPassive();
+
+            //startHeartbeat(delay);
+
         }
     };
 
     protected final Handler<StartFailureDetector> startFailureDetectorHandler = new Handler<StartFailureDetector>() {
         @Override
         public void handle(StartFailureDetector startFailureDetector) {
-            nodes = startFailureDetector.getNodes();
-            LOG.info("I am FailureDetector and i got LUT: \n " + nodes.toString());
-
-            startHeartbeat();
+            leadernodes = startFailureDetector.getLeaderNodes();
+            passivenodes = startFailureDetector.getPassiveNodes();
+            startHeartbeat(0);
 
         }
     };
 
-    protected final ClassMatchedHandler<FailureCheckResponse, Message> failureCheckResponseHandler = new ClassMatchedHandler<FailureCheckResponse, Message>() {
+    protected final ClassMatchedHandler<LeaderFailureCheckResponse, Message> leaderFailureCheckResponseHandler = new ClassMatchedHandler<LeaderFailureCheckResponse, Message>() {
         @Override
-        public void handle(FailureCheckResponse failureCheckResponse, Message message) {
-            NetAddress sender = failureCheckResponse.getSender();
-            LOG.info("GOT HEARTBEAT FROM " + sender);
-            active.add(sender);
+        public void handle(LeaderFailureCheckResponse leaderFailureCheckResponse, Message message) {
+            NetAddress sender = leaderFailureCheckResponse.getSender();
+            LOG.info("IN LEADER, GOT HEARTBEAT FROM " + sender);
+            leaderSuspects.remove(sender);
+            leaderActive.add(sender);
         }
     };
 
-    //*****Functions*****//
+    protected final ClassMatchedHandler<PassiveFailureCheckResponse, Message> passiveFailureCheckResponseHandler = new ClassMatchedHandler<PassiveFailureCheckResponse, Message>() {
+        @Override
+        public void handle(PassiveFailureCheckResponse passiveFailureCheckResponse, Message message) {
+            NetAddress sender = passiveFailureCheckResponse.getSender();
+            LOG.info("IN PASSIVE, GOT HEARTBEAT FROM " + sender);
+            passiveSuspects.remove(sender);
+            passiveActive.add(sender);
+        }
+    };
 
-    private void startHeartbeat() {
-        long timeout = (config().getValue("id2203.project.keepAlivePeriod", Long.class) * 6);
+
+//*****Functions*****//
+
+    private void startHeartbeat(long delay) {
+        long timeout = (config().getValue("id2203.project.keepAlivePeriod", Long.class) * 12) + delay;
+        LOG.info("TIMEOUT IN FAILUREDETECTOR IS " + timeout + " and delay is " + delay);
         SchedulePeriodicTimeout spt = new SchedulePeriodicTimeout(timeout, timeout);
         spt.setTimeoutEvent(new BSTimeout(spt));
         trigger(spt, timer);
@@ -89,10 +99,68 @@ public class FailureDetector extends ComponentDefinition {
 
     }
 
+    private void checkLeaders() {
+
+        if (leaderSuspects.isEmpty()){
+
+            if(leaderActive.isEmpty()){
+                LOG.info("FIRST TIME LEADER");
+                for(NetAddress address : leadernodes){
+                    leaderSuspects.add(address);
+                    trigger(new Message(self,address,new LeaderFailureCheck(address)),net);
+                }
+            }else{
+                LOG.info("ACTIVE LEADERS FAILURE CHECK");
+                for(NetAddress address : leaderActive){
+                    leaderSuspects.add(address);
+                    trigger(new Message(self,address,new LeaderFailureCheck(address)),net);
+                }
+
+            }
+        }
+        else{
+            LOG.info("LEADER SUSPECTS " + leaderSuspects.toString());
+            announceFailure();
+        }
+
+    }
+
+    private void checkPassive() {
+
+        if (passiveSuspects.isEmpty()){
+
+            if(passiveActive.isEmpty()){
+                LOG.info("FIRST TIME PASSIVE");
+                for(NetAddress address : passivenodes){
+                    passiveSuspects.add(address);
+                    trigger(new Message(self,address,new PassiveFailureCheck(address)),net);
+                }
+            }else{
+                LOG.info("PASSIVE NODES FAILURE CHECK ");
+                for(NetAddress address : passiveActive){
+                    passiveSuspects.add(address);
+                    trigger(new Message(self,address,new PassiveFailureCheck(address)),net);
+                }
+
+            }
+        }
+        else{
+            LOG.info("PASSIVE SUSPECTS " + passiveSuspects.toString());
+        }
+
+    }
+
+
+    private void announceFailure() {
+        LOG.info("FAAAAAAAAAAAAAAAAAAAAAAAAAAAil!!!!!!!!!!!!!!!! ");
+
+    }
+
     {
         subscribe(timeoutHandler, timer);
         subscribe(startFailureDetectorHandler, failure);
-        subscribe(failureCheckResponseHandler, net);
+        subscribe(leaderFailureCheckResponseHandler, net);
+        subscribe(passiveFailureCheckResponseHandler, net);
 
     }
 

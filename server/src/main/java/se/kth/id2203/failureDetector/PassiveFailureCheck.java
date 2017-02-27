@@ -6,9 +6,9 @@ import se.sics.kompics.KompicsEvent;
 import java.io.Serializable;
 
 /**
- * Created by tobiaj on 2017-02-23.
+ * Created by tobiaj on 2017-02-27.
  */
-public class FailureCheck implements KompicsEvent, Serializable {
+public class PassiveFailureCheck implements KompicsEvent, Serializable{
 
     public NetAddress getTarget() {
         return target;
@@ -16,7 +16,7 @@ public class FailureCheck implements KompicsEvent, Serializable {
 
     private NetAddress target;
 
-    public FailureCheck(NetAddress target){
+    public PassiveFailureCheck(NetAddress target){
         this.target = target;
 
     }
