@@ -29,6 +29,7 @@ import java.util.UUID;
 import com.google.common.collect.ImmutableSet;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import se.kth.id2203.Broadcast.BEBPort;
 import se.kth.id2203.bootstrapping.*;
 import se.kth.id2203.failureDetector.FailureCheck;
 import se.kth.id2203.failureDetector.FailureCheckResponse;
@@ -50,6 +51,7 @@ import sun.nio.ch.Net;
  * Note: This implementation does not fulfill the project task. You have to
  * support multiple partitions!
  * <p>
+ *
  * @author Lars Kroll <lkroll@kth.se>
  */
 public class VSOverlayManager extends ComponentDefinition {
@@ -61,7 +63,7 @@ public class VSOverlayManager extends ComponentDefinition {
     protected final Positive<Timer> timer = requires(Timer.class);
 
     protected final Negative<FailurePort> failure = provides(FailurePort.class);
-
+    protected final Negative<BEBPort> beb = provides(BEBPort.class);
 
     //******* Fields ******
     final NetAddress self = config().getValue("id2203.project.address", NetAddress.class);
@@ -98,18 +100,17 @@ public class VSOverlayManager extends ComponentDefinition {
                 LOG.info("Got NodeAssignment, overlay ready.");
                 lut = (LookupTable) event.assignment;
 
-                for (NetAddress address : lut.getNodes()){
-                    if (address.equals(self)){
+                for (NetAddress address : lut.getNodes()) {
+                    if (address.equals(self)) {
                         leader = true;
-                        LOG.info("TO STRING IN OVERLAY: " + lut.toString() + " \n AND I AM:  "+ self +
+                        LOG.info("TO STRING IN OVERLAY: " + lut.toString() + " \n AND I AM:  " + self +
                                 " \n I AM LEADER: " + leader);
 
-                    }
-                    else {
+                    } else {
                         addressToleader = address;
                         failureAddressToLeader.add(address);
-                        LOG.info("TO STRING IN OVERLAY: " + lut.toString() + " \n AND I AM:  "+ self +
-                                " \n I Have leader status : " + leader  + " my leader is: " + addressToleader);
+                        LOG.info("TO STRING IN OVERLAY: " + lut.toString() + " \n AND I AM:  " + self +
+                                " \n I Have leader status : " + leader + " my leader is: " + addressToleader);
                         trigger(new StartFailureDetector(failureAddressToLeader), failure);
 
                     }
@@ -140,8 +141,8 @@ public class VSOverlayManager extends ComponentDefinition {
     protected final ClassMatchedHandler<FailureCheck, Message> failureCheckHandler = new ClassMatchedHandler<FailureCheck, Message>() {
         @Override
         public void handle(FailureCheck failureCheck, Message message) {
-            if (leader){
-                LOG.info("I am: " + self + " \n i am LEADER " +   leader + " GOT FAILURE CHECK FROM: " + message.getSource());
+            if (leader) {
+                LOG.info("I am: " + self + " \n i am LEADER " + leader + " GOT FAILURE CHECK FROM: " + message.getSource());
                 trigger(new Message(self, message.getSource(), new FailureCheckResponse(true, self)), net);
             }
         }
@@ -152,13 +153,11 @@ public class VSOverlayManager extends ComponentDefinition {
         @Override
         public void handle(GetLeaders getLeaders, Message message) {
             supervisor = message.getSource();
-            if (leader){
+            if (leader) {
                 trigger(new Message(self, supervisor, new GetLeaders()), net);
             }
         }
     };
-
-
 
 
     {

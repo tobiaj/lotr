@@ -1,6 +1,8 @@
 package se.kth.id2203;
 
 import com.google.common.base.Optional;
+import se.kth.id2203.Broadcast.BEB;
+import se.kth.id2203.Broadcast.BEBPort;
 import se.kth.id2203.bootstrapping.BootstrapClient;
 import se.kth.id2203.bootstrapping.BootstrapServer;
 import se.kth.id2203.bootstrapping.Bootstrapping;
@@ -33,7 +35,7 @@ public class ParentComponent
     //******* Changes ******
     protected final Component supervisor = create(Supervisor.class, Init.NONE);
     protected final Component failureDetector = create(FailureDetector.class, Init.NONE);
-
+    protected final Component broadcast = create(BEB.class, Init.NONE);
 
 
     {
@@ -60,6 +62,11 @@ public class ParentComponent
         connect(net, supervisor.getNegative(Network.class), Channel.TWO_WAY);
         connect(net, failureDetector.getNegative(Network.class), Channel.TWO_WAY);
         connect(timer, failureDetector.getNegative(Timer.class), Channel.TWO_WAY);
+
+        //Added BEB
+        connect(net, broadcast.getNegative(Network.class), Channel.TWO_WAY);
+        connect(timer, broadcast.getNegative(Timer.class), Channel.TWO_WAY);
+        connect(overlay.getPositive(BEBPort.class), broadcast.getNegative(BEBPort.class), Channel.TWO_WAY);
 
         //connect(supervisor.getPositive(FailurePort.class), overlay.getNegative(FailurePort.class), Channel.TWO_WAY);
 
