@@ -50,7 +50,6 @@ public class BEB extends ComponentDefinition {
 
         for (NetAddress node : nodes)
             trigger(new Message(self, node, new Broadcast(broadcast.key, broadcast.value, null)), net);
-
     }
 
     {
