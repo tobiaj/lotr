@@ -71,6 +71,7 @@ public class VSOverlayManager extends ComponentDefinition {
     private HashSet<NetAddress> failureAddressToLeader = new HashSet<>();
     private boolean leaderAlive;
     private LinkedList<NetAddress> nodesInGroup = new LinkedList<>();
+    private HashSet<NetAddress> inactive = new HashSet<>();
 
 
     //******* Handlers ******
@@ -100,6 +101,8 @@ public class VSOverlayManager extends ComponentDefinition {
 
                 }
 
+                LOG.info("NODES IN THE LINKED LIST IS NOW " + nodesInGroup.toString());
+
                 if (nodesInGroup.getFirst().equals(self)){
                     leader = true;
                     LOG.info("TO STRING IN OVERLAY: " + lut.toString() + " \n AND I AM:  "+ self +
@@ -111,7 +114,6 @@ public class VSOverlayManager extends ComponentDefinition {
                     failureAddressToLeader.add(addressToleader);
                     LOG.info("TO STRING IN OVERLAY: " + lut.toString() + " \n AND I AM:  "+ self +
                             " \n I Have leader status : " + leader  + " my leader is: " + addressToleader);
-                    //trigger(new StartFailureDetector(failureAddressToLeader), failure);
 
                 }
 
@@ -150,7 +152,9 @@ public class VSOverlayManager extends ComponentDefinition {
         @Override
         public void handle(PassiveFailureCheck passiveFailureCheck, Message message) {
             LOG.info("PASSIVE GOT FAILURE CHECK FROM: " + message.getSource());
-            trigger(new Message(self, message.getSource(), new PassiveFailureCheckResponse(true, self)), net);
+
+                trigger(new Message(self, message.getSource(), new PassiveFailureCheckResponse(true, self)), net);
+
         }
     };
 
@@ -165,8 +169,45 @@ public class VSOverlayManager extends ComponentDefinition {
         }
     };
 
+    protected final ClassMatchedHandler<Suspected, Message> suspectedMessage = new ClassMatchedHandler<Suspected, Message>() {
+        @Override
+        public void handle(Suspected suspected, Message message) {
+            NetAddress address = suspected.getAddress();
+            LOG.info("OVERLAY GOT SUSPECT " + address);
+            if (nodesInGroup.contains(address)){
 
+                nodesInGroup.remove(address);
+                inactive.add(address);
 
+                addressToleader = nodesInGroup.getFirst();
+
+                if (addressToleader.equals(self)) {
+                    if (!leader) {
+                        leader = true;
+                        trigger(new Message(self, message.getSource(), new SuspectResponse(self)), net);
+                    }
+
+                }
+
+                LOG.info("NODES IN GROUP IS " + nodesInGroup.toString());
+                LOG.info("NODES IN INACTIVE " + inactive.toString());
+
+            }
+        }
+    };
+
+    protected final ClassMatchedHandler<Unsuspected, Message> unsuspectedMessage = new ClassMatchedHandler<Unsuspected, Message>() {
+        @Override
+        public void handle(Unsuspected unsuspected, Message message) {
+            NetAddress address = unsuspected.getAddress();
+            LOG.info("OVERLAY " + address + " CAME BACK TO LIVE ADDED TO THE LIST AGAIN");
+
+            if (inactive.contains(address)){
+                inactive.remove(address);
+                nodesInGroup.addLast(address);
+            }
+        }
+    };
 
     {
         subscribe(initialAssignmentHandler, boot);
@@ -175,6 +216,8 @@ public class VSOverlayManager extends ComponentDefinition {
         subscribe(leaderFailureCheck, net);
         subscribe(passiveFailureCheck, net);
         subscribe(getLeaders, net);
+        subscribe(suspectedMessage, net);
+        subscribe(unsuspectedMessage, net);
 
     }
 }

@@ -5,6 +5,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import se.kth.id2203.failureDetector.FailurePort;
 import se.kth.id2203.failureDetector.StartFailureDetector;
+import se.kth.id2203.failureDetector.UpdateLeadersInSupervisor;
 import se.kth.id2203.networking.Message;
 import se.kth.id2203.networking.NetAddress;
 import se.kth.id2203.overlay.LookupTable;
@@ -97,6 +98,14 @@ public class Supervisor extends ComponentDefinition{
         }
     };
 
+    protected final Handler<UpdateLeadersInSupervisor> updateLeadersInSupervisorHandler = new Handler<UpdateLeadersInSupervisor>() {
+        @Override
+        public void handle(UpdateLeadersInSupervisor updateLeadersInSupervisor) {
+            LOG.info("SUPERVISOR GOT NEW LEADERS " + leaderNodes.toString());
+            leaderNodes = updateLeadersInSupervisor.getLeaders();
+        }
+    };
+
     private void getStartingLeaders() {
         for (NetAddress address : lut.getNodes()){
             trigger(new Message(self, address, new GetLeaders()), net);
@@ -110,7 +119,7 @@ public class Supervisor extends ComponentDefinition{
             }
         }
 
-        trigger(new StartFailureDetector(leaderNodes, passiveNodes), failure);
+        trigger(new StartFailureDetector(leaderNodes, passiveNodes, lut), failure);
     }
 
     private void createKeyRanges(){
@@ -144,6 +153,7 @@ public class Supervisor extends ComponentDefinition{
         subscribe(localRouteHandler, route);
         subscribe(startSupervisorHandler, supervisor);
         subscribe(getLeadersResponse, net);
+        subscribe(updateLeadersInSupervisorHandler, failure);
 
     }
 

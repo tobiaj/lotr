@@ -2,6 +2,7 @@ package se.kth.id2203.failureDetector;
 
 import com.google.common.collect.ImmutableSet;
 import se.kth.id2203.networking.NetAddress;
+import se.kth.id2203.overlay.LookupTable;
 import se.sics.kompics.KompicsEvent;
 
 import java.util.HashSet;
@@ -23,10 +24,17 @@ public class StartFailureDetector implements KompicsEvent{
     private HashSet<NetAddress> leaderNodes;
     private HashSet<NetAddress> passiveNodes;
 
-    public StartFailureDetector(HashSet<NetAddress> leaderNodes, HashSet<NetAddress> passiveNodes){
+    public LookupTable getLut() {
+        return lut;
+    }
+
+    private LookupTable lut;
+
+    public StartFailureDetector(HashSet<NetAddress> leaderNodes, HashSet<NetAddress> passiveNodes, LookupTable lut){
 
         this.leaderNodes = leaderNodes;
         this.passiveNodes = passiveNodes;
+        this.lut = lut;
 
     }
 }
