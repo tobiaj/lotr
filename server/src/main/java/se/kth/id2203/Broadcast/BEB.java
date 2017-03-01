@@ -13,6 +13,7 @@ import se.sics.kompics.Positive;
 import se.sics.kompics.network.Network;
 import se.sics.kompics.timer.Timer;
 
+import java.util.Collection;
 import java.util.HashSet;
 
 /**
@@ -34,7 +35,7 @@ public class BEB extends ComponentDefinition {
     final NetAddress self = config().getValue("id2203.project.address", NetAddress.class);
 
     /*Active nodes that will receive the broadcast from the leader*/
-    private HashSet<NetAddress> nodes;
+    private Collection<NetAddress> nodes;
 
     protected final Handler<Broadcast> broadcastInitiation = new Handler<Broadcast>()
 
@@ -42,6 +43,7 @@ public class BEB extends ComponentDefinition {
         @Override
         public void handle(Broadcast broadcast) {
             LOG.info("Key: " + broadcast.key + " Value: " + broadcast.value);
+            nodes = broadcast.nodes;
             initiateBroadcast(broadcast);
         }
     };
@@ -49,7 +51,9 @@ public class BEB extends ComponentDefinition {
     private void initiateBroadcast(Broadcast broadcast) {
 
         for (NetAddress node : nodes)
-            trigger(new Message(self, node, new Broadcast(broadcast.key, broadcast.value, null)), net);
+            if (!node.equals(self)) {
+                trigger(new Message(self, node, new Broadcast(broadcast.key, broadcast.value, null)), net);
+            }
     }
 
     {

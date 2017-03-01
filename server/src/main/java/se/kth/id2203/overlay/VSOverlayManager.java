@@ -215,7 +215,16 @@ public class VSOverlayManager extends ComponentDefinition {
         }
     };
 
+    protected final ClassMatchedHandler<Broadcast, Message> broadcastReceiver = new ClassMatchedHandler<Broadcast, Message>() {
+        @Override
+        public void handle(Broadcast broadcast, Message message) {
+         LOG.info("Key: " + broadcast.getKey() + " Value: " + broadcast.getValue()
+                 + "\n Received from: " + message.getSource());
+        }
+    };
+
     {
+        subscribe(broadcastReceiver, net);
         subscribe(initialAssignmentHandler, boot);
         subscribe(bootHandler, boot);
         subscribe(connectHandler, net);

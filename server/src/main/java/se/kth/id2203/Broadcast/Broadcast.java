@@ -4,6 +4,8 @@ import se.kth.id2203.networking.NetAddress;
 import se.sics.kompics.ComponentDefinition;
 import se.sics.kompics.KompicsEvent;
 
+import javax.sql.rowset.serial.SerialArray;
+import java.io.Serializable;
 import java.text.CollationElementIterator;
 import java.util.Collection;
 import java.util.HashSet;
@@ -11,8 +13,15 @@ import java.util.HashSet;
 /**
  * Created by habtu on 2017-02-27.
  */
-public class Broadcast implements KompicsEvent {
+public class Broadcast implements KompicsEvent, Serializable {
 
+    public int getKey() {
+        return key;
+    }
+
+    public String getValue() {
+        return value;
+    }
 
     int key;
     String value;
