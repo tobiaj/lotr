@@ -2,11 +2,8 @@ package se.kth.id2203.Broadcast;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import se.kth.id2203.failureDetector.FailureDetector;
 import se.kth.id2203.networking.Message;
 import se.kth.id2203.networking.NetAddress;
-import se.kth.id2203.overlay.VSOverlayManager;
-import se.sics.kompics.ClassMatchedHandler;
 import se.sics.kompics.ComponentDefinition;
 import se.sics.kompics.Handler;
 import se.sics.kompics.Positive;
@@ -14,7 +11,6 @@ import se.sics.kompics.network.Network;
 import se.sics.kompics.timer.Timer;
 
 import java.util.Collection;
-import java.util.HashSet;
 
 /**
  * Created by habtu on 2017-02-27.
