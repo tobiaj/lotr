@@ -11,6 +11,6 @@ public class FailurePort extends PortType {
         indication(LeaderFailureCheck.class);
         indication(PassiveFailureCheck.class);
         indication(StartFailureDetector.class);
-        //indication(HeartbeatResponse.class);
+        request(UpdateLeadersInSupervisor.class);
     }
 }
