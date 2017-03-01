@@ -24,26 +24,22 @@
 package se.kth.id2203.overlay;
 
 import java.util.HashSet;
+import java.util.LinkedList;
 import java.util.Random;
 import java.util.UUID;
 
-import com.google.common.collect.ImmutableSet;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import se.kth.id2203.Broadcast.BEBPort;
 import se.kth.id2203.Broadcast.Broadcast;
 import se.kth.id2203.bootstrapping.*;
-import se.kth.id2203.failureDetector.FailureCheck;
-import se.kth.id2203.failureDetector.FailureCheckResponse;
-import se.kth.id2203.failureDetector.FailurePort;
-import se.kth.id2203.failureDetector.StartFailureDetector;
+import se.kth.id2203.failureDetector.*;
 import se.kth.id2203.networking.Message;
 import se.kth.id2203.networking.NetAddress;
 import se.kth.id2203.supervisor.GetLeaders;
 import se.sics.kompics.*;
 import se.sics.kompics.network.Network;
 import se.sics.kompics.timer.Timer;
-import sun.nio.ch.Net;
 
 /**
  * The V(ery)S(imple)OverlayManager.
@@ -78,6 +74,8 @@ public class VSOverlayManager extends ComponentDefinition {
     private NetAddress supervisor;
     private HashSet<NetAddress> failureAddressToLeader = new HashSet<>();
     private boolean leaderAlive;
+    private LinkedList<NetAddress> nodesInGroup = new LinkedList<>();
+    private HashSet<NetAddress> inactive = new HashSet<>();
 
 
     //******* Handlers ******
@@ -103,20 +101,24 @@ public class VSOverlayManager extends ComponentDefinition {
                 lut = (LookupTable) event.assignment;
 
                 for (NetAddress address : lut.getNodes()) {
-                    if (address.equals(self)) {
-                        leader = true;
-                        LOG.info("TO STRING IN OVERLAY: " + lut.toString() + " \n AND I AM:  " + self +
-                                " \n I AM LEADER: " + leader);
+                    nodesInGroup.add(address);
 
-                    } else {
-                        addressToleader = address;
-                        failureAddressToLeader.add(address);
-                        LOG.info("TO STRING IN OVERLAY: " + lut.toString() + " \n AND I AM:  " + self +
-                                " \n I Have leader status : " + leader + " my leader is: " + addressToleader);
-                        trigger(new StartFailureDetector(failureAddressToLeader), failure);
+                }
 
-                    }
-                    break;
+                LOG.info("NODES IN THE LINKED LIST IS NOW " + nodesInGroup.toString());
+
+                if (nodesInGroup.getFirst().equals(self)){
+                    leader = true;
+                    LOG.info("TO STRING IN OVERLAY: " + lut.toString() + " \n AND I AM:  "+ self +
+                            " \n I AM LEADER: " + leader);
+
+                }
+                else {
+                    addressToleader = nodesInGroup.getFirst();
+                    failureAddressToLeader.add(addressToleader);
+                    LOG.info("TO STRING IN OVERLAY: " + lut.toString() + " \n AND I AM:  "+ self +
+                            " \n I Have leader status : " + leader  + " my leader is: " + addressToleader);
+
                 }
 
             } else {
@@ -139,15 +141,26 @@ public class VSOverlayManager extends ComponentDefinition {
         }
     };
 
-
-    protected final ClassMatchedHandler<FailureCheck, Message> failureCheckHandler = new ClassMatchedHandler<FailureCheck, Message>() {
+    protected final ClassMatchedHandler<LeaderFailureCheck, Message> leaderFailureCheck = new ClassMatchedHandler<LeaderFailureCheck, Message>() {
         @Override
-        public void handle(FailureCheck failureCheck, Message message) {
-            if (leader) {
-                LOG.info("I am: " + self + " \n i am LEADER " + leader + " GOT FAILURE CHECK FROM: " + message.getSource());
-                trigger(new Message(self, message.getSource(), new FailureCheckResponse(true, self)), net);
+        public void handle(LeaderFailureCheck leaderFailureCheck, Message message) {
+            //To be safe
+            if (leader){
+                LOG.info("LEADER GOT FAILURE CHECK FROM: " + message.getSource());
+                trigger(new Message(self, message.getSource(), new LeaderFailureCheckResponse(true, self)), net);
                 trigger(new Broadcast(new Random().nextInt(9), "simon", lut.getNodes()), beb);
+
             }
+        }
+    };
+
+    protected final ClassMatchedHandler<PassiveFailureCheck, Message> passiveFailureCheck = new ClassMatchedHandler<PassiveFailureCheck, Message>() {
+        @Override
+        public void handle(PassiveFailureCheck passiveFailureCheck, Message message) {
+            LOG.info("PASSIVE GOT FAILURE CHECK FROM: " + message.getSource());
+
+                trigger(new Message(self, message.getSource(), new PassiveFailureCheckResponse(true, self)), net);
+
         }
     };
 
@@ -162,13 +175,55 @@ public class VSOverlayManager extends ComponentDefinition {
         }
     };
 
+    protected final ClassMatchedHandler<Suspected, Message> suspectedMessage = new ClassMatchedHandler<Suspected, Message>() {
+        @Override
+        public void handle(Suspected suspected, Message message) {
+            NetAddress address = suspected.getAddress();
+            LOG.info("OVERLAY GOT SUSPECT " + address);
+            if (nodesInGroup.contains(address)){
+
+                nodesInGroup.remove(address);
+                inactive.add(address);
+
+                addressToleader = nodesInGroup.getFirst();
+
+                if (addressToleader.equals(self)) {
+                    if (!leader) {
+                        leader = true;
+                        trigger(new Message(self, message.getSource(), new SuspectResponse(self)), net);
+                    }
+
+                }
+
+                LOG.info("NODES IN GROUP IS " + nodesInGroup.toString());
+                LOG.info("NODES IN INACTIVE " + inactive.toString());
+
+            }
+        }
+    };
+
+    protected final ClassMatchedHandler<Unsuspected, Message> unsuspectedMessage = new ClassMatchedHandler<Unsuspected, Message>() {
+        @Override
+        public void handle(Unsuspected unsuspected, Message message) {
+            NetAddress address = unsuspected.getAddress();
+            LOG.info("OVERLAY " + address + " CAME BACK TO LIVE ADDED TO THE LIST AGAIN");
+
+            if (inactive.contains(address)){
+                inactive.remove(address);
+                nodesInGroup.addLast(address);
+            }
+        }
+    };
 
     {
         subscribe(initialAssignmentHandler, boot);
         subscribe(bootHandler, boot);
         subscribe(connectHandler, net);
-        subscribe(failureCheckHandler, net);
+        subscribe(leaderFailureCheck, net);
+        subscribe(passiveFailureCheck, net);
         subscribe(getLeaders, net);
+        subscribe(suspectedMessage, net);
+        subscribe(unsuspectedMessage, net);
 
     }
 }

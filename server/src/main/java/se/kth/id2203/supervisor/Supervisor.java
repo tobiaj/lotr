@@ -1,13 +1,11 @@
 package se.kth.id2203.supervisor;
 
-import com.google.common.collect.ImmutableSet;
 import com.larskroll.common.J6;
-import com.sun.org.apache.xpath.internal.operations.Neg;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import se.kth.id2203.bootstrapping.BSTimeout;
 import se.kth.id2203.failureDetector.FailurePort;
 import se.kth.id2203.failureDetector.StartFailureDetector;
+import se.kth.id2203.failureDetector.UpdateLeadersInSupervisor;
 import se.kth.id2203.networking.Message;
 import se.kth.id2203.networking.NetAddress;
 import se.kth.id2203.overlay.LookupTable;
@@ -15,9 +13,7 @@ import se.kth.id2203.overlay.RouteMsg;
 import se.kth.id2203.overlay.Routing;
 import se.sics.kompics.*;
 import se.sics.kompics.network.Network;
-import se.sics.kompics.timer.SchedulePeriodicTimeout;
 import se.sics.kompics.timer.Timer;
-import sun.nio.ch.Net;
 
 import java.util.*;
 
@@ -42,6 +38,7 @@ public class Supervisor extends ComponentDefinition{
     private LookupTable lut;
     private HashMap<Integer, Range> keysToGroups = new HashMap<>();
     private HashSet<NetAddress> leaderNodes = new HashSet<>();
+    private HashSet<NetAddress> passiveNodes = new HashSet<>();
     private int numberOfLeaders;
 
     private UUID timeoutId;
@@ -86,8 +83,6 @@ public class Supervisor extends ComponentDefinition{
             createKeyRanges();
 
             getStartingLeaders();
-
-            startFailureDetector();
         }
     };
 
@@ -103,6 +98,14 @@ public class Supervisor extends ComponentDefinition{
         }
     };
 
+    protected final Handler<UpdateLeadersInSupervisor> updateLeadersInSupervisorHandler = new Handler<UpdateLeadersInSupervisor>() {
+        @Override
+        public void handle(UpdateLeadersInSupervisor updateLeadersInSupervisor) {
+            LOG.info("SUPERVISOR GOT NEW LEADERS " + leaderNodes.toString());
+            leaderNodes = updateLeadersInSupervisor.getLeaders();
+        }
+    };
+
     private void getStartingLeaders() {
         for (NetAddress address : lut.getNodes()){
             trigger(new Message(self, address, new GetLeaders()), net);
@@ -110,7 +113,13 @@ public class Supervisor extends ComponentDefinition{
     }
 
     private void startFailureDetector() {
-        trigger(new StartFailureDetector(leaderNodes), failure);
+        for (NetAddress address : lut.getNodes()){
+            if (!leaderNodes.contains(address)){
+                passiveNodes.add(address);
+            }
+        }
+
+        trigger(new StartFailureDetector(leaderNodes, passiveNodes, lut), failure);
     }
 
     private void createKeyRanges(){
@@ -144,6 +153,7 @@ public class Supervisor extends ComponentDefinition{
         subscribe(localRouteHandler, route);
         subscribe(startSupervisorHandler, supervisor);
         subscribe(getLeadersResponse, net);
+        subscribe(updateLeadersInSupervisorHandler, failure);
 
     }
 
