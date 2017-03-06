@@ -58,6 +58,10 @@ public class LookupTable implements NodeAssignment {
         return partitions.get(partition);
     }
 
+    public Collection<NetAddress> getNodes(int group) {
+        return partitions.get(group);
+    }
+
     public Collection<NetAddress> getNodes() {
         return partitions.values();
     }

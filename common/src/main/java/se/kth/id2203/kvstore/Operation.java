@@ -38,10 +38,12 @@ public class Operation implements KompicsEvent, Serializable {
 
     public final String key;
     public final UUID id;
+    public final String operation;
 
-    public Operation(String key) {
+    public Operation(String key, String operation) {
         this.key = key;
         this.id = UUID.randomUUID();
+        this.operation = operation;
     }
 
     @Override

@@ -33,5 +33,7 @@ public class Routing extends PortType {
 
     {
         request(RouteMsg.class);
+        indication(BroadcastNodes.class);
+        request(BroadcastNodes.class);
     }
 }

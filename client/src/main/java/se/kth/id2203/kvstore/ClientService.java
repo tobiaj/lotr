@@ -25,6 +25,8 @@ package se.kth.id2203.kvstore;
 
 import com.google.common.base.Optional;
 import com.google.common.util.concurrent.SettableFuture;
+
+import java.io.Serializable;
 import java.util.Map;
 import java.util.TreeMap;
 import java.util.UUID;
@@ -108,6 +110,7 @@ public class ClientService extends ComponentDefinition {
         public void handle(OpWithFuture event) {
             RouteMsg rm = new RouteMsg(event.op.key, event.op); // don't know which partition is responsible, so ask the bootstrap server to forward it
             trigger(new Message(self, server, rm), net);
+            LOG.info("EVENT INFO : " + event.op.key + " ID " + event.op.id + " OP" + event.op);
             pending.put(event.op.id, event.f);
         }
     };
@@ -133,14 +136,15 @@ public class ClientService extends ComponentDefinition {
         subscribe(responseHandler, net);
     }
     
-    Future<OpResponse> op(String key) {
-        Operation op = new Operation(key);
+    Future<OpResponse> op(String key, String oper) {
+        Operation op = new Operation(key, oper);
         OpWithFuture owf = new OpWithFuture(op);
         trigger(owf, onSelf);
         return owf.f;
     }
-    
-    public static class OpWithFuture implements KompicsEvent {
+
+
+    public static class OpWithFuture implements KompicsEvent, Serializable {
         
         public final Operation op;
         public final SettableFuture<OpResponse> f;

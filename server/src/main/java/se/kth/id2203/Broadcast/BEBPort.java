@@ -9,5 +9,6 @@ public class BEBPort extends PortType {
 
     {
         indication(Broadcast.class);
+        indication(GetBroadcast.class);
     }
 }

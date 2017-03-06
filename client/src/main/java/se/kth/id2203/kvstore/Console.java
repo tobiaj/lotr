@@ -63,37 +63,142 @@ public class Console implements Runnable {
     }
 
     {
-        commands.put("op", new Command() {
+
+
+        commands.put("put", new Command() {
 
             @Override
             public boolean execute(String[] cmdline, ClientService worker) {
                 if (cmdline.length == 2) {
-                    Future<OpResponse> fr = worker.op(cmdline[1]);
-                    out.println("Operation sent! Awaiting response...");
-                    try {
-                        OpResponse r = fr.get();
-                        out.println("Operation complete! Response was: " + r.status);
-                        return true;
-                    } catch (InterruptedException | ExecutionException ex) {
-                        ex.printStackTrace(out);
+                    Future<OpResponse> fr = null;
+
+                    if (cmdline[1].split(" ").length == 2) {
+                        fr = worker.op(cmdline[1], "put");
+                        for (String string : cmdline) {
+                            out.println("CMDLINE IS: " + string);
+                        }
+
+                        out.println("Operation sent! Awaiting response...");
+                        try {
+                            OpResponse r = fr.get();
+                            out.println("Operation complete! Response was: " + r.status);
+                            return true;
+                        } catch (InterruptedException | ExecutionException ex) {
+                            ex.printStackTrace(out);
+                            return false;
+                        }
+
+                    } else {
                         return false;
                     }
 
-                } else {
+                }else{
                     return false;
+
                 }
             }
 
             @Override
             public String usage() {
-                return "op <key>";
+                return "THIS IS PUT";
             }
 
             @Override
             public String help() {
-                return "Just a test operation...replace with proper put get";
+                return "to use the PUT command say put key value";
             }
         });
+
+        commands.put("get", new Command() {
+
+            @Override
+            public boolean execute(String[] cmdline, ClientService worker) {
+                if (cmdline.length == 2) {
+                    Future<OpResponse> fr = null;
+                    if (cmdline[1].split(" ").length == 1) {
+                        fr = worker.op(cmdline[1], "get");
+                        for (String string : cmdline) {
+                            out.println("CMDLINE IS: " + string);
+                        }
+
+
+                        out.println("Operation sent! Awaiting response...");
+                        try {
+                            OpResponse r = fr.get();
+                            out.println("Operation complete! Response was: " + r.status);
+                            out.println("Value for key: " + cmdline[1] + " is: " + r.value);
+                            return true;
+                        } catch (InterruptedException | ExecutionException ex) {
+                            ex.printStackTrace(out);
+                            return false;
+                        }
+
+                    } else {
+                        return false;
+                    }
+                }else{
+                    return false;
+
+                }
+            }
+
+            @Override
+            public String usage() {
+                return "THIS IS GET";
+            }
+
+            @Override
+            public String help() {
+                return "to use the GET command say get key";
+            }
+        });
+
+
+        commands.put("swap", new Command() {
+
+            @Override
+            public boolean execute(String[] cmdline, ClientService worker) {
+                if (cmdline.length == 2) {
+                    Future<OpResponse> fr = null;
+
+                    if (cmdline[1].split(" ").length == 3) {
+                        fr = worker.op(cmdline[1], "swap");
+                        for (String string : cmdline) {
+                            out.println("CMDLINE IS: " + string);
+                        }
+
+                        out.println("Operation sent! Awaiting response...");
+                        try {
+                            OpResponse r = fr.get();
+                            out.println("Operation complete! Response was: " + r.status);
+                            return true;
+                        } catch (InterruptedException | ExecutionException ex) {
+                            ex.printStackTrace(out);
+                            return false;
+                        }
+
+                    } else {
+                        return false;
+                    }
+
+                }else{
+                    return false;
+
+                }
+            }
+
+            @Override
+            public String usage() {
+                return "THIS IS SWAP";
+            }
+
+            @Override
+            public String help() {
+                return "to use the SWAP command say swap key value newValue";
+            }
+        });
+
+
         commands.put("help", new Command() {
 
             @Override

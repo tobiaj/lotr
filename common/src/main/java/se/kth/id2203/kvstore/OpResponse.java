@@ -38,10 +38,12 @@ public class OpResponse implements KompicsEvent, Serializable {
 
     public final UUID id;
     public final Code status;
+    public final String value;
 
-    public OpResponse(UUID id, Code status) {
+    public OpResponse(UUID id, Code status, String value) {
         this.id = id;
         this.status = status;
+        this.value = value;
     }
 
     @Override
@@ -54,6 +56,6 @@ public class OpResponse implements KompicsEvent, Serializable {
 
     public static enum Code {
 
-        OK, NOT_FOUND, NOT_IMPLEMENTED;
+        OK, NOT_FOUND, NOT_IMPLEMENTED, BAHSJHAIOSDIOASHDO;
     }
 }

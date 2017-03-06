@@ -23,13 +23,14 @@
  */
 package se.kth.id2203.networking;
 
+import java.io.Serializable;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.util.Map;
 import se.sics.kompics.config.Conversions;
 import se.sics.kompics.config.Converter;
 
-public class NetAddressConverter implements Converter<NetAddress> {
+public class NetAddressConverter implements Converter<NetAddress>, Serializable {
 
     @Override
     public NetAddress convert(Object o) {

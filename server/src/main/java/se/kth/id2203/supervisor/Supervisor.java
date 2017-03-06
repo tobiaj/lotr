@@ -6,6 +6,7 @@ import org.slf4j.LoggerFactory;
 import se.kth.id2203.failureDetector.FailurePort;
 import se.kth.id2203.failureDetector.StartFailureDetector;
 import se.kth.id2203.failureDetector.UpdateLeadersInSupervisor;
+import se.kth.id2203.kvstore.OpResponse;
 import se.kth.id2203.networking.Message;
 import se.kth.id2203.networking.NetAddress;
 import se.kth.id2203.overlay.LookupTable;
@@ -14,6 +15,7 @@ import se.kth.id2203.overlay.Routing;
 import se.sics.kompics.*;
 import se.sics.kompics.network.Network;
 import se.sics.kompics.timer.Timer;
+import sun.nio.ch.Net;
 
 import java.util.*;
 
@@ -25,7 +27,6 @@ public class Supervisor extends ComponentDefinition{
     final static Logger LOG = LoggerFactory.getLogger(Supervisor.class);
 
     //******* Ports ******
-    protected final Negative<Routing> route = provides(Routing.class);
     protected final Positive<Network> net = requires(Network.class);
     protected final Positive<Timer> timer = requires(Timer.class);
 
@@ -51,27 +52,27 @@ public class Supervisor extends ComponentDefinition{
         @Override
         public void handle(RouteMsg content, Message context) {
             LOG.info("I AM IN ROUTE HANDLER and key is: " + content.key);
-            Collection<NetAddress> partition = lut.lookup(content.key);
 
-            LOG.info("GOT PARTIION " + partition.toString());
+            int partition = findCorrectPartition(content.key);
 
-            /*
-             NetAddress target = J6.randomElement(partition);
-            LOG.info("Forwarding message for key {} to {}", content.key, target);
-            trigger(new Message(context.getSource(), target, content.msg), net);*/
+            Collection<NetAddress> nodes = lut.getNodes(partition);
+
+            LOG.info("GOT PARTIION " + nodes.toString());
+
+
+            NetAddress target = null;
+
+            for (NetAddress address : nodes){
+                if (leaderNodes.contains(address)){
+                    target = address;
+                }
+            }
+            LOG.info("TARGET IS " + target);
+            LOG.info("Forwarding message for key {} with operation {} to {}", content.key, content.msg, target);
+            trigger(new Message(context.getSource(), target, content.msg), net);
+
         }
     };
-    protected final Handler<RouteMsg> localRouteHandler = new Handler<RouteMsg>() {
-
-        @Override
-        public void handle(RouteMsg event) {
-            Collection<NetAddress> partition = lut.lookup(event.key);
-            NetAddress target = J6.randomElement(partition);
-            LOG.info("Routing message for key {} to {}", event.key, target);
-            trigger(new Message(self, target, event.msg), net);
-        }
-    };
-
 
     protected final Handler<StartSupervisor> startSupervisorHandler = new Handler<StartSupervisor>() {
         @Override
@@ -147,10 +148,43 @@ public class Supervisor extends ComponentDefinition{
 
     }
 
+    private int findCorrectPartition(String input) {
+
+        String[] split = input.split(" ");
+        int group;
+        int hashKey;
+
+        if (split.length > 1) {
+            String key = split[0];
+            String value = split[1];
+            LOG.info("SPLIT : " + split[0]);
+            LOG.info("SPLIT : " + split[1]);
+
+            hashKey = key.hashCode();
+            LOG.info("HASHKEY : " + hashKey);
+
+            group = hashKey % lut.getNumberOfGroups();
+
+            LOG.info("GROUP RESPONSIBLE IS " + group);
+
+            return group;
+        }
+
+        else {
+
+            hashKey = input.hashCode();
+            group = hashKey % lut.getNumberOfGroups();
+
+
+        }
+
+        return group;
+
+    }
+
 
     {
         subscribe(routeHandler, net);
-        subscribe(localRouteHandler, route);
         subscribe(startSupervisorHandler, supervisor);
         subscribe(getLeadersResponse, net);
         subscribe(updateLeadersInSupervisorHandler, failure);

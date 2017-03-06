@@ -50,11 +50,13 @@ import se.sics.kompics.KompicsEvent;
 import se.sics.kompics.PatternExtractor;
 import se.sics.kompics.network.Transport;
 
+import java.io.Serializable;
+
 /**
  *
  * @author Lars Kroll <lkroll@kth.se>
  */
-public class Message extends NetMessage implements PatternExtractor<Class, KompicsEvent> {
+public class Message extends NetMessage implements PatternExtractor<Class, KompicsEvent>, Serializable {
 
     private static final long serialVersionUID = -5669973156467202337L;
 

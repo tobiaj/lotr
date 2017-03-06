@@ -25,13 +25,10 @@ package se.kth.id2203.overlay;
 
 import java.util.HashSet;
 import java.util.LinkedList;
-import java.util.Random;
 import java.util.UUID;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import se.kth.id2203.Broadcast.BEBPort;
-import se.kth.id2203.Broadcast.Broadcast;
 import se.kth.id2203.bootstrapping.*;
 import se.kth.id2203.failureDetector.*;
 import se.kth.id2203.networking.Message;
@@ -60,8 +57,7 @@ public class VSOverlayManager extends ComponentDefinition {
     protected final Positive<Network> net = requires(Network.class);
     protected final Positive<Timer> timer = requires(Timer.class);
 
-    protected final Negative<FailurePort> failure = provides(FailurePort.class);
-    protected final Negative<BEBPort> beb = provides(BEBPort.class);
+    protected final Negative<Routing> routing = provides(Routing.class);
 
     //******* Fields ******
     final NetAddress self = config().getValue("id2203.project.address", NetAddress.class);
@@ -73,7 +69,6 @@ public class VSOverlayManager extends ComponentDefinition {
     private NetAddress addressToleader;
     private NetAddress supervisor;
     private HashSet<NetAddress> failureAddressToLeader = new HashSet<>();
-    private boolean leaderAlive;
     private LinkedList<NetAddress> nodesInGroup = new LinkedList<>();
     private HashSet<NetAddress> inactive = new HashSet<>();
 
@@ -121,6 +116,8 @@ public class VSOverlayManager extends ComponentDefinition {
 
                 }
 
+                trigger(new BroadcastNodes(nodesInGroup), routing);
+
             } else {
                 LOG.error("Got invalid NodeAssignment type. Expected: LookupTable; Got: {}", event.assignment.getClass());
             }
@@ -148,7 +145,6 @@ public class VSOverlayManager extends ComponentDefinition {
             if (leader){
                 LOG.info("LEADER GOT FAILURE CHECK FROM: " + message.getSource());
                 trigger(new Message(self, message.getSource(), new LeaderFailureCheckResponse(true, self)), net);
-                trigger(new Broadcast(new Random().nextInt(9), "simon", lut.getNodes()), beb);
 
             }
         }
@@ -198,7 +194,10 @@ public class VSOverlayManager extends ComponentDefinition {
                 LOG.info("NODES IN GROUP IS " + nodesInGroup.toString());
                 LOG.info("NODES IN INACTIVE " + inactive.toString());
 
+                trigger(new BroadcastNodes(nodesInGroup), routing);
+
             }
+
         }
     };
 
@@ -211,20 +210,14 @@ public class VSOverlayManager extends ComponentDefinition {
             if (inactive.contains(address)){
                 inactive.remove(address);
                 nodesInGroup.addLast(address);
-            }
-        }
-    };
+                trigger(new BroadcastNodes(nodesInGroup), routing);
 
-    protected final ClassMatchedHandler<Broadcast, Message> broadcastReceiver = new ClassMatchedHandler<Broadcast, Message>() {
-        @Override
-        public void handle(Broadcast broadcast, Message message) {
-         LOG.info("Key: " + broadcast.getKey() + " Value: " + broadcast.getValue()
-                 + "\n Received from: " + message.getSource());
+            }
+
         }
     };
 
     {
-        subscribe(broadcastReceiver, net);
         subscribe(initialAssignmentHandler, boot);
         subscribe(bootHandler, boot);
         subscribe(connectHandler, net);

@@ -10,6 +10,7 @@ import se.kth.id2203.failureDetector.FailureDetector;
 import se.kth.id2203.failureDetector.FailurePort;
 import se.kth.id2203.kvstore.KVService;
 import se.kth.id2203.networking.NetAddress;
+import se.kth.id2203.overlay.Routing;
 import se.kth.id2203.supervisor.Supervisor;
 import se.kth.id2203.supervisor.SupervisorPort;
 import se.kth.id2203.overlay.VSOverlayManager;
@@ -55,7 +56,6 @@ public class ParentComponent
         connect(boot.getPositive(Bootstrapping.class), overlay.getNegative(Bootstrapping.class), Channel.TWO_WAY);
         connect(net, overlay.getNegative(Network.class), Channel.TWO_WAY);
         // KV
-        //connect(overlay.getPositive(Routing.class), kv.getNegative(Routing.class), Channel.TWO_WAY);
         connect(net, kv.getNegative(Network.class), Channel.TWO_WAY);
 
         //Changes
@@ -65,13 +65,11 @@ public class ParentComponent
 
         //Added BEB
         connect(net, broadcast.getNegative(Network.class), Channel.TWO_WAY);
-        connect(timer, broadcast.getNegative(Timer.class), Channel.TWO_WAY);
-        connect(overlay.getPositive(BEBPort.class), broadcast.getNegative(BEBPort.class), Channel.TWO_WAY);
-
-        //connect(supervisor.getPositive(FailurePort.class), overlay.getNegative(FailurePort.class), Channel.TWO_WAY);
+        connect(kv.getPositive(BEBPort.class), broadcast.getNegative(BEBPort.class), Channel.TWO_WAY);
 
         connect(supervisor.getPositive(FailurePort.class), failureDetector.getNegative(FailurePort.class), Channel.TWO_WAY);
-        connect(overlay.getPositive(FailurePort.class), failureDetector.getNegative(FailurePort.class), Channel.TWO_WAY);
+        connect(overlay.getPositive(Routing.class), kv.getNegative(Routing.class), Channel.TWO_WAY);
+        //connect(overlay.getPositive(FailurePort.class), failureDetector.getNegative(FailurePort.class), Channel.TWO_WAY);
 
     }
 }

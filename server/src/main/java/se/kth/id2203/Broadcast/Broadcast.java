@@ -1,36 +1,34 @@
 package se.kth.id2203.Broadcast;
 
+import se.kth.id2203.kvstore.ValueSeq;
 import se.kth.id2203.networking.NetAddress;
-import se.sics.kompics.ComponentDefinition;
 import se.sics.kompics.KompicsEvent;
 
-import javax.sql.rowset.serial.SerialArray;
 import java.io.Serializable;
-import java.text.CollationElementIterator;
 import java.util.Collection;
-import java.util.HashSet;
 
 /**
  * Created by habtu on 2017-02-27.
  */
 public class Broadcast implements KompicsEvent, Serializable {
 
-    public int getKey() {
+    public String getKey() {
         return key;
     }
 
-    public String getValue() {
-        return value;
+    String key;
+
+    public ValueSeq getValueSeq() {
+        return valueSeq;
     }
 
-    int key;
-    String value;
+    ValueSeq valueSeq;
 
     Collection<NetAddress> nodes;
 
-    public Broadcast(int key, String value, Collection<NetAddress> nodes){
+    public Broadcast(String key, ValueSeq valueSeq, Collection<NetAddress> nodes){
         this.key = key;
-        this.value = value;
+        this.valueSeq = valueSeq;
         this.nodes = nodes;
     }
 }
