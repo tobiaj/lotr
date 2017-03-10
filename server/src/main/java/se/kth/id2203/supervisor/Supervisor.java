@@ -1,21 +1,17 @@
 package se.kth.id2203.supervisor;
 
-import com.larskroll.common.J6;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import se.kth.id2203.failureDetector.FailurePort;
 import se.kth.id2203.failureDetector.StartFailureDetector;
 import se.kth.id2203.failureDetector.UpdateLeadersInSupervisor;
-import se.kth.id2203.kvstore.OpResponse;
 import se.kth.id2203.networking.Message;
 import se.kth.id2203.networking.NetAddress;
 import se.kth.id2203.overlay.LookupTable;
 import se.kth.id2203.overlay.RouteMsg;
-import se.kth.id2203.overlay.Routing;
 import se.sics.kompics.*;
 import se.sics.kompics.network.Network;
 import se.sics.kompics.timer.Timer;
-import sun.nio.ch.Net;
 
 import java.util.*;
 
@@ -37,7 +33,6 @@ public class Supervisor extends ComponentDefinition{
     final NetAddress self = config().getValue("id2203.project.address", NetAddress.class);
 
     private LookupTable lut;
-    private HashMap<Integer, Range> keysToGroups = new HashMap<>();
     private HashSet<NetAddress> leaderNodes = new HashSet<>();
     private HashSet<NetAddress> passiveNodes = new HashSet<>();
     private int numberOfLeaders;
@@ -58,6 +53,7 @@ public class Supervisor extends ComponentDefinition{
             Collection<NetAddress> nodes = lut.getNodes(partition);
 
             LOG.info("GOT PARTIION " + nodes.toString());
+            LOG.info("LEADER NODES ARE " + leaderNodes.toString());
 
 
             NetAddress target = null;
@@ -81,7 +77,6 @@ public class Supervisor extends ComponentDefinition{
             lut = startSupervisor.getLookupTable();
             LOG.info("I GOT LOOKUPTABLE " + lut.toString());
             numberOfLeaders = lut.getNumberOfGroups();
-            createKeyRanges();
 
             getStartingLeaders();
         }
@@ -109,6 +104,7 @@ public class Supervisor extends ComponentDefinition{
 
     private void getStartingLeaders() {
         for (NetAddress address : lut.getNodes()){
+            LOG.info("TRIGGER LEADER GET FROM SUPERVISOR TO " + address);
             trigger(new Message(self, address, new GetLeaders()), net);
         }
     }
@@ -121,31 +117,6 @@ public class Supervisor extends ComponentDefinition{
         }
 
         trigger(new StartFailureDetector(leaderNodes, passiveNodes, lut), failure);
-    }
-
-    private void createKeyRanges(){
-
-        int temp = lut.getNumberOfGroups();
-        LOG.info("TEMP NUMBER IS " + temp);
-        int maxRange = 100000;
-        int divided = maxRange / temp;
-
-        int min = -1;
-        int max = divided;
-
-        for (int i = 0; i < temp ; i++) {
-            Range range = new Range(min + 1, max);
-            keysToGroups.put(i, range);
-
-            min+= divided;
-            max += divided;
-        }
-
-        for (Range range : keysToGroups.values()){
-            LOG.info(" Range min is " + range.getMin() + " and max is " + range.getMax());
-        }
-
-
     }
 
     private int findCorrectPartition(String input) {
@@ -164,6 +135,8 @@ public class Supervisor extends ComponentDefinition{
             LOG.info("HASHKEY : " + hashKey);
 
             group = hashKey % lut.getNumberOfGroups();
+            group = Math.abs(group);
+
 
             LOG.info("GROUP RESPONSIBLE IS " + group);
 
@@ -172,8 +145,12 @@ public class Supervisor extends ComponentDefinition{
 
         else {
 
+
             hashKey = input.hashCode();
+            LOG.info("HASHKEY "+ hashKey);
+            LOG.info("NUMBER " + lut.getNumberOfGroups());
             group = hashKey % lut.getNumberOfGroups();
+            group = Math.abs(group);
 
 
         }
@@ -181,7 +158,6 @@ public class Supervisor extends ComponentDefinition{
         return group;
 
     }
-
 
     {
         subscribe(routeHandler, net);

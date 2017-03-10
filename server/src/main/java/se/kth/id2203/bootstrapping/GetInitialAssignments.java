@@ -27,7 +27,9 @@ import com.google.common.collect.ImmutableSet;
 import se.kth.id2203.networking.NetAddress;
 import se.sics.kompics.KompicsEvent;
 
-public class GetInitialAssignments implements KompicsEvent {
+import java.io.Serializable;
+
+public class GetInitialAssignments implements KompicsEvent, Serializable {
 
     public final ImmutableSet<NetAddress> nodes;
 

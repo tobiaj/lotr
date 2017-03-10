@@ -95,26 +95,29 @@ public class KVService extends ComponentDefinition {
         String key = split[0];
         String value = split[1];
         String newValue = split[2];
+        LOG.info("GOT " + key + " " + value + " " + newValue);
 
         if (database.get(key) != null){
             ValueSeq valueSeq = database.get(key);
             String matchValue = valueSeq.getValue();
 
             if (matchValue.equals(value)) {
-                valueSeq.setValue(newValue);
+                //valueSeq.setValue(newValue);
                 MajorityAck majorityAck = new MajorityAck(nodesToBroadcastTo, 0, context.getSource(), content.id);
-                int temp = valueSeq.getSequenceNumber();
-                valueSeq.setSequenceNumber(temp + 1);
-                database.put(key, valueSeq);
+                sequenceNumber = sequenceNumber + 1;
+                ValueSeq valueSeqNew = new ValueSeq(newValue, sequenceNumber);
+                //valueSeq.setSequenceNumber(temp);
+                database.put(key, valueSeqNew);
                 ackPutList.put(key, majorityAck);
 
-                trigger(new Broadcast(key, valueSeq, nodesToBroadcastTo), beb);
+                LOG.info("SENDING TO BROADCAST " + valueSeqNew.toString());
+
+                trigger(new Broadcast(key, valueSeqNew, nodesToBroadcastTo), beb);
 
                 //trigger(new Message(self, context.getSource(), new OpResponse(content.id, Code.OK, "")), net);
-                LOG.info("DATABASE CONTAINS " + database.toString());
             }
             else{
-                trigger(new Message(self, context.getSource(), new OpResponse(content.id, Code.NOT_FOUND, "")), net);
+                trigger(new Message(self, context.getSource(), new OpResponse(content.id, Code.SWAPFAIL, "")), net);
 
             }
         }
@@ -127,11 +130,17 @@ public class KVService extends ComponentDefinition {
     private void doCommandGet(Operation content, Message context) {
         LOG.info("GOT GET COMMAND FOR KEY " + content.key);
 
-        MajorityAck majorityAck = new MajorityAck(nodesToBroadcastTo, 0, context.getSource(), content.id);
-        ValueSeq valueSeq = database.get(content.key);
-        ackGetList.put(content.key, majorityAck);
+        if (database.get(content.key) != null) {
+            MajorityAck majorityAck = new MajorityAck(nodesToBroadcastTo, 1, context.getSource(), content.id);
+            ValueSeq valueSeq = database.get(content.key);
+            ackGetList.put(content.key, majorityAck);
 
-        trigger(new GetBroadcast(content.key, valueSeq), beb);
+            trigger(new GetBroadcast(content.key, valueSeq), beb);
+        }
+        else{
+            trigger(new Message(self, context.getSource(), new OpResponse(content.id, Code.NOT_FOUND, "")), net);
+
+        }
 
     }
 
@@ -141,33 +150,15 @@ public class KVService extends ComponentDefinition {
         String value = split[1];
         LOG.info("ADDED TO THE DATABASE KEY: " + split[0] + " and the Value " +  split[1]);
 
-        ValueSeq valueSeq;
-        MajorityAck majorityAck;
-        if (database.get(key)!=null){
-            valueSeq = database.get(key);
-            int tempNumber = valueSeq.getSequenceNumber() + 1;
-            valueSeq.setSequenceNumber(tempNumber);
-            valueSeq.setValue(value);
+        sequenceNumber = sequenceNumber + 1;
+        ValueSeq valueSeq = new ValueSeq(value, sequenceNumber);
+        MajorityAck majorityAck = new MajorityAck(nodesToBroadcastTo, 1, context.getSource(), content.id);
+        database.put(key, valueSeq);
+        ackPutList.put(key, majorityAck);
 
-            majorityAck = new MajorityAck(nodesToBroadcastTo, 1, context.getSource(), content.id);
-            ackPutList.put(key, majorityAck);
-
-            LOG.info("DATABASE CONTAINS: " + database.toString() + " and nodes to broadcast to is " + nodesToBroadcastTo.toString());
-
-        }
-        else {
-            sequenceNumber++;
-            valueSeq = new ValueSeq(value, 0);
-            majorityAck = new MajorityAck(nodesToBroadcastTo, 1, context.getSource(), content.id);
-            database.put(key, valueSeq);
-            ackPutList.put(key, majorityAck);
-
-            LOG.info("DATABASE CONTAINS: " + database.toString() + " and nodes to broadcast to is " + nodesToBroadcastTo.toString());
-        }
+        LOG.info("DATABASE CONTAINS: " + database.toString() + " and nodes to broadcast to is " + nodesToBroadcastTo.toString());
 
         trigger(new Broadcast(key, valueSeq, nodesToBroadcastTo), beb);
-
-        //trigger(new Message(self, context.getSource(), new OpResponse(content.id, Code.OK, "")), net);
 
     }
 
@@ -186,9 +177,15 @@ public class KVService extends ComponentDefinition {
         public void handle(Broadcast broadcast, Message message) {
             LOG.info("Key: " + broadcast.getKey() + " Value: " + broadcast.getValueSeq().getValue()
                     + "\n Received from: " + message.getSource());
+
             ValueSeq valueSeq = broadcast.getValueSeq();
-            database.put(broadcast.getKey(), valueSeq);
-            LOG.info("DATABASE CONTAINS: "+ database.toString());
+            LOG.info("GOT BROADCAST " + valueSeq.toString() + " my seq is " + sequenceNumber);
+            int tempNumber = valueSeq.getSequenceNumber();
+            if (tempNumber > sequenceNumber) {
+                database.put(broadcast.getKey(), valueSeq);
+                sequenceNumber = tempNumber;
+                LOG.info("DATABASE CONTAINS: " + database.toString());
+            }
             trigger(new Message(self, message.getSource(), new AckMessage(broadcast.getKey())), net);
 
 
@@ -223,37 +220,34 @@ public class KVService extends ComponentDefinition {
                 MajorityAck tempMap = ackGetList.get(key);
 
                 LinkedList<NetAddress> tempList = tempMap.getBroadCastednodes();
-                int nodes = tempMap.getNumberofNodes() + 1;
                 //Safety check
                 if (tempList.contains(message.getSource())) {
+                    int nodes = tempMap.getNumberofNodes() + 1;
 
+                    if (valueSeq.getSequenceNumber() > currentValueSeq.getSequenceNumber()){
+                        currentValueSeq.setSequenceNumber(valueSeq.getSequenceNumber());
+                        currentValueSeq.setValue(valueSeq.getValue());
+                        database.put(key, currentValueSeq);
+                    }
                     //If broadcast nodes only is one
                     if (nodes == tempList.size()) {
 
-                        if (valueSeq.getSequenceNumber() > currentValueSeq.getSequenceNumber()){
-                            currentValueSeq.setSequenceNumber(valueSeq.getSequenceNumber());
-                            currentValueSeq.setValue(valueSeq.getValue());
-                        }
-
                         ackGetList.remove(key);
-                        trigger(new Message(self, tempMap.getClient(), new OpResponse(tempMap.getId(), Code.OK, valueSeq.getValue())), net);
-
-                    } else if (nodes >= (tempList.size() / 2)) {
-
-                        if (valueSeq.getSequenceNumber() > currentValueSeq.getSequenceNumber()){
-                            currentValueSeq.setSequenceNumber(valueSeq.getSequenceNumber());
-                            currentValueSeq.setValue(valueSeq.getValue());
-                        }
-
-                        ackGetList.remove(key);
+                        LOG.info("SENDING BACK " + valueSeq.getValue());
                         trigger(new Message(self, tempMap.getClient(), new OpResponse(tempMap.getId(), Code.OK, valueSeq.getValue())), net);
 
                     }
+                    /*
+                    else if (nodes >= (tempList.size() / 2)) {
+
+
+                        ackGetList.remove(key);
+                        LOG.info("SENDING BACK " + valueSeq.getValue());
+
+                        trigger(new Message(self, tempMap.getClient(), new OpResponse(tempMap.getId(), Code.OK, valueSeq.getValue())), net);
+
+                    }*/
                     else{
-                        if (valueSeq.getSequenceNumber() > currentValueSeq.getSequenceNumber()){
-                            currentValueSeq.setSequenceNumber(valueSeq.getSequenceNumber());
-                            currentValueSeq.setValue(valueSeq.getValue());
-                        }
 
                         LOG.info("Still need more ack to reach majority!");
                         tempMap.setNumberofNodes(nodes);

@@ -10,6 +10,11 @@ import java.io.Serializable;
  */
 public class GetLeaders implements KompicsEvent, Serializable {
 
+    public NetAddress getLeader() {
+        return leader;
+    }
+
+    public NetAddress leader;
     public GetLeaders() {
 
     }

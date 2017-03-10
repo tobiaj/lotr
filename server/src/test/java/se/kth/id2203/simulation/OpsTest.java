@@ -36,19 +36,27 @@ public class OpsTest {
     
     private static final int NUM_MESSAGES = 10;
     private final SimulationResultMap res = SimulationResultSingleton.getInstance();
+    private final SimulationResultMap res2 = SimulationResultSingleton.getInstance();
+    private final SimulationResultMap res3 = SimulationResultSingleton.getInstance();
 
-    /*
+
     @Test
     public void simpleOpsTest() {
         long seed = 123;
         SimulationScenario.setSeed(seed);
-        SimulationScenario simpleBootScenario = ScenarioGen.simpleOps(3);
+        SimulationScenario simpleBootScenario = ScenarioGen.simpleOps(10);
         res.put("messages", NUM_MESSAGES);
+        res2.put("messages", NUM_MESSAGES);
+        res3.put("messages", NUM_MESSAGES);
         simpleBootScenario.simulate(LauncherComp.class);
+
         for (int i = 0; i < NUM_MESSAGES; i++) {
-            Assert.assertEquals("NOT_IMPLEMENTED", res.get("test"+i, String.class));
+            i = i * 500;
+            Assert.assertEquals("OK", res.get("test"+i, String.class));
+            Assert.assertEquals("OK" , res2.get("test" + i, String.class));
+            Assert.assertEquals("OK" , res3.get("test" + i, String.class));
             // of course the correct response should be SUCCESS not NOT_IMPLEMENTED, but like this the test passes
         }
     }
-*/
+
 }

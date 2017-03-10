@@ -24,6 +24,8 @@
 package se.kth.id2203.bootstrapping;
 
 import com.google.common.collect.ImmutableSet;
+
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.UUID;
@@ -44,6 +46,7 @@ import se.sics.kompics.network.Network;
 import se.sics.kompics.timer.CancelPeriodicTimeout;
 import se.sics.kompics.timer.SchedulePeriodicTimeout;
 import se.sics.kompics.timer.Timer;
+import sun.nio.ch.Net;
 
 public class BootstrapServer extends ComponentDefinition {
 
@@ -63,10 +66,15 @@ public class BootstrapServer extends ComponentDefinition {
     private Set<NetAddress> active = new HashSet<>();
     private Set<NetAddress> ready = new HashSet<>();
     private Set<NetAddress> createGroup = new HashSet<>();
+
+    private HashMap<Integer, Set<NetAddress>> groups = new HashMap<>();
     private LookupTable lut = new LookupTable();
+    private int groupCounter = 0;
     private int counter = 0;
+    private boolean done = false;
 
     private NodeAssignment initialAssignment = null;
+
     //******* Handlers ******
     protected final Handler<Start> startHandler = new Handler<Start>() {
         @Override
@@ -85,66 +93,100 @@ public class BootstrapServer extends ComponentDefinition {
         public void handle(BSTimeout e) {
             if (state == State.COLLECTING) {
                 LOG.info("{} hosts in active set.", active.size());
-                if (active.size() >= bootThreshold) {
+                if (groupCounter == 2 && !done) {
 
-                    if (counter == 0) {
-                        lut = lut.generate(ImmutableSet.copyOf(active), counter);
-                    }
-                    else {
-                        if (lut.addToExisting(ImmutableSet.copyOf(active), counter, lut)) {
-                            LOG.info("SUCCEEDED!!!!!!!! WITH COUNTER:  " + counter);
-                        }
-                        else{
-                            LOG.info("NOT SUCCEEDED!!!!!!!");
-                        }
-                    }
 
-                    LOG.info("LOOKUPTABLE TO STRING " + lut.toString());
+                    lut = lut.generate(ImmutableSet.copyOf(groups.get(0)), 0);
+
+                    lut.addToExisting(ImmutableSet.copyOf(groups.get(1)), 1, lut);
 
                     bootUp();
+
                 }
             } else if (state == State.SEEDING) {
                 LOG.info("{} hosts in ready set.", ready.size());
-                if (ready.size() >= bootThreshold) {
-                    LOG.info("Finished seeding. Bootstrapping complete.");
-                    LOG.debug("InitalAssignment in seeding when threshold is max: " + initialAssignment);
-                    //trigger(new Booted(initialAssignment), boot);
-
+                if (ready.size() >= 6) {
                     ready = new HashSet<>();
-                    //initialAssignment = null;
-
-                    if(counter == 2){
-                        LOG.info("TRIGGER THE SUPERVISOR");
-                        trigger(new StartSupervisor(lut), supervisorPortNegative);
-                    }
+                    done = true;
+                    LOG.info("Finished seeding. Bootstrapping complete.");
+                    LOG.info("TRIGGER THE SUPERVISOR");
                     state = State.COLLECTING;
+
+                    trigger(new StartSupervisor(lut), supervisorPortNegative);
+
+
                 }
             } else if (state == State.DONE) {
                 //suicide();
             }
         }
     };
-    protected final Handler<InitialAssignments> assignmentHandler = new Handler<InitialAssignments>() {
+    protected final ClassMatchedHandler<InitialAssignments, Message> assignmentHandler = new ClassMatchedHandler<InitialAssignments, Message>() {
         @Override
-        public void handle(InitialAssignments e) {
-            LOG.info("Seeding assignments...");
-            initialAssignment = e.assignment;
+        public void handle(InitialAssignments initialAssignments, Message message) {
+            LOG.info("Seeding assignments... WITH COUNTER " + counter);
+            initialAssignment = initialAssignments.assignment;
             LOG.debug("InitalAssignment in handler: " + initialAssignment);
-            for (NetAddress node : active) {
-                trigger(new Message(self, node, new Boot(initialAssignment)), net);
+
+            NetAddress address = message.getSource();
+            ready.add(address);
+            trigger(new Message(self, address, new Boot(initialAssignment)), net);
+
+            /*
+            if (groups.get(counter) != null) {
+                Set<NetAddress> temp = groups.get(counter);
+                for (NetAddress address : temp) {
+                    trigger(new Message(self, address, new Boot(initialAssignment)), net);
+                }
+                ++counter;
+                if (counter == 2) {
+                    LOG.info("TRIGGER THE SUPERVISOR");
+                    state = State.COLLECTING;
+
+                    trigger(new StartSupervisor(lut), supervisorPortNegative);
+
+                }
             }
+            */
+
+
 
             //initialAssignment = null;
-            active = new HashSet<>();
+            //active = new HashSet<>();
             //ready.add(self);
-        }
+
+    }
+
     };
     protected final ClassMatchedHandler<CheckIn, Message> checkinHandler = new ClassMatchedHandler<CheckIn, Message>() {
 
         @Override
         public void handle(CheckIn content, Message context) {
             LOG.debug("SOURCE: " + context.getSource());
-            active.add(context.getSource());
+
+            if (groups.size() > 0){
+
+                for (Set<NetAddress> set : groups.values()){
+                    if (!set.contains(context.getSource())){
+                        LOG.info("KOMMER JAG HIT");
+                        active.add(context.getSource());
+                    }
+                }
+            }
+            else {
+
+                active.add(context.getSource());
+
+            }
+            LOG.info("ADDED TO THE ACTIVE LIST NOW IS " + active.toString());
+
+            if (active.size() == 3){
+                groups.put(groupCounter, active);
+                groupCounter++;
+                active = new HashSet<>();
+            }
+
+
         }
     };
     protected final ClassMatchedHandler<Ready, Message> readyHandler = new ClassMatchedHandler<Ready, Message>() {
@@ -157,7 +199,7 @@ public class BootstrapServer extends ComponentDefinition {
     {
         subscribe(startHandler, control);
         subscribe(timeoutHandler, timer);
-        subscribe(assignmentHandler, boot);
+        subscribe(assignmentHandler, net);
         subscribe(checkinHandler, net);
         subscribe(readyHandler, net);
     }
@@ -171,19 +213,15 @@ public class BootstrapServer extends ComponentDefinition {
         LOG.info("Threshold reached. Generating assignments...");
         state = State.SEEDING;
 
-        int i = 0;
-        for (NetAddress address : active) {
-            if (i < 3) {
-                if (address != self) {
-                    createGroup.add(address);
-                    i++;
-                }
+        for (Set<NetAddress> set : groups.values()){
+
+            for (NetAddress address : set){
+
+            trigger(new Message(self, address, new GetInitialAssignments(ImmutableSet.copyOf(set), 0)), net);
+
             }
         }
 
-        trigger(new GetInitialAssignments(ImmutableSet.copyOf(createGroup), counter), boot);
-        createGroup = new HashSet<>();
-        counter++;
     }
 
     static enum State {

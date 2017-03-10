@@ -26,6 +26,14 @@ public class ValueSeq implements Serializable{
     public String value;
     public int sequenceNumber;
 
+    @Override
+    public String toString() {
+        return "ValueSeq{" +
+                "value='" + value + '\'' +
+                ", sequenceNumber=" + sequenceNumber +
+                '}';
+    }
+
     public ValueSeq(String value, int sequenceNumber) {
         this.value = value;
         this.sequenceNumber = sequenceNumber;

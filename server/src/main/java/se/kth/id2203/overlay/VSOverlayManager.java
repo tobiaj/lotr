@@ -76,14 +76,13 @@ public class VSOverlayManager extends ComponentDefinition {
     //******* Handlers ******
 
 
-    protected final Handler<GetInitialAssignments> initialAssignmentHandler = new Handler<GetInitialAssignments>() {
-
+    protected final ClassMatchedHandler<GetInitialAssignments, Message> initialAssignmentHandler = new ClassMatchedHandler<GetInitialAssignments, Message>() {
         @Override
-        public void handle(GetInitialAssignments event) {
+        public void handle(GetInitialAssignments getInitialAssignments, Message message) {
             LOG.info("Generating LookupTable...");
-            lut = lut.generate(event.nodes, 0);
+            lut = lut.generate(getInitialAssignments.nodes, 0);
             LOG.debug("Generated assignments:\n{}", lut);
-            trigger(new InitialAssignments(lut), boot);
+            trigger(new Message(self, message.getSource(), new InitialAssignments(lut)), net);
         }
     };
 
@@ -218,7 +217,7 @@ public class VSOverlayManager extends ComponentDefinition {
     };
 
     {
-        subscribe(initialAssignmentHandler, boot);
+        subscribe(initialAssignmentHandler, net);
         subscribe(bootHandler, boot);
         subscribe(connectHandler, net);
         subscribe(leaderFailureCheck, net);
