@@ -51,10 +51,10 @@ public class OpsTest {
         simpleBootScenario.simulate(LauncherComp.class);
 
         for (int i = 0; i < NUM_MESSAGES; i++) {
-            i = i * 500;
-            Assert.assertEquals("OK", res.get("test"+i, String.class));
-            Assert.assertEquals("OK" , res2.get("test" + i, String.class));
-            Assert.assertEquals("OK" , res3.get("test" + i, String.class));
+            int j = i * 500;
+            Assert.assertEquals("OK", res.get("test" + j, String.class));
+            Assert.assertEquals("OK" , res2.get("test" + j, String.class));
+            Assert.assertEquals("OK" , res3.get("test" + j, String.class));
             // of course the correct response should be SUCCESS not NOT_IMPLEMENTED, but like this the test passes
         }
     }

@@ -135,7 +135,7 @@ public class KVService extends ComponentDefinition {
             ValueSeq valueSeq = database.get(content.key);
             ackGetList.put(content.key, majorityAck);
 
-            trigger(new GetBroadcast(content.key, valueSeq), beb);
+            trigger(new GetBroadcast(content.key, valueSeq, nodesToBroadcastTo), beb);
         }
         else{
             trigger(new Message(self, context.getSource(), new OpResponse(content.id, Code.NOT_FOUND, "")), net);
@@ -237,16 +237,6 @@ public class KVService extends ComponentDefinition {
                         trigger(new Message(self, tempMap.getClient(), new OpResponse(tempMap.getId(), Code.OK, valueSeq.getValue())), net);
 
                     }
-                    /*
-                    else if (nodes >= (tempList.size() / 2)) {
-
-
-                        ackGetList.remove(key);
-                        LOG.info("SENDING BACK " + valueSeq.getValue());
-
-                        trigger(new Message(self, tempMap.getClient(), new OpResponse(tempMap.getId(), Code.OK, valueSeq.getValue())), net);
-
-                    }*/
                     else{
 
                         LOG.info("Still need more ack to reach majority!");

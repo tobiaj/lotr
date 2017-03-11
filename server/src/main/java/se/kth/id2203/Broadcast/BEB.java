@@ -45,10 +45,10 @@ public class BEB extends ComponentDefinition {
     protected final Handler<GetBroadcast> getBroadcastHandler = new Handler<GetBroadcast>() {
         @Override
         public void handle(GetBroadcast getBroadcast) {
-            for (NetAddress node : nodes)
+            for (NetAddress node : getBroadcast.nodes)
                 if (!node.equals(self)) {
                     LOG.info("TRIGGER GET BROADCAST FOR " + node);
-                    trigger(new Message(self, node, new GetBroadcast(getBroadcast.key, getBroadcast.getValueSeq())), net);
+                    trigger(new Message(self, node, new GetBroadcast(getBroadcast.key, getBroadcast.getValueSeq(), null)), net);
                 }
 
         }

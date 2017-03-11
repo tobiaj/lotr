@@ -65,7 +65,7 @@ public class BootstrapServer extends ComponentDefinition {
     private UUID timeoutId;
     private Set<NetAddress> active = new HashSet<>();
     private Set<NetAddress> ready = new HashSet<>();
-    private Set<NetAddress> createGroup = new HashSet<>();
+    private Set<NetAddress> watingNodes = new HashSet<>();
 
     private HashMap<Integer, Set<NetAddress>> groups = new HashMap<>();
     private LookupTable lut = new LookupTable();
@@ -93,19 +93,22 @@ public class BootstrapServer extends ComponentDefinition {
         public void handle(BSTimeout e) {
             if (state == State.COLLECTING) {
                 LOG.info("{} hosts in active set.", active.size());
-                if (groupCounter == 2 && !done) {
+                if (groupCounter == 3 && !done) {
 
 
                     lut = lut.generate(ImmutableSet.copyOf(groups.get(0)), 0);
 
                     lut.addToExisting(ImmutableSet.copyOf(groups.get(1)), 1, lut);
 
+                    lut.addToExisting(ImmutableSet.copyOf(groups.get(2)), 2, lut);
+
+
                     bootUp();
 
                 }
             } else if (state == State.SEEDING) {
                 LOG.info("{} hosts in ready set.", ready.size());
-                if (ready.size() >= 6) {
+                if (ready.size() >= 9) {
                     ready = new HashSet<>();
                     done = true;
                     LOG.info("Finished seeding. Bootstrapping complete.");
@@ -164,28 +167,30 @@ public class BootstrapServer extends ComponentDefinition {
         public void handle(CheckIn content, Message context) {
             LOG.debug("SOURCE: " + context.getSource());
 
-            if (groups.size() > 0){
+            if (!watingNodes.contains(context.getSource())) {
+                if (groups.size() > 0) {
 
-                for (Set<NetAddress> set : groups.values()){
-                    if (!set.contains(context.getSource())){
-                        LOG.info("KOMMER JAG HIT");
-                        active.add(context.getSource());
+                    for (Set<NetAddress> set : groups.values()) {
+                        if (!set.contains(context.getSource())) {
+                            active.add(context.getSource());
+                            watingNodes.add(context.getSource());
+
+                        }
                     }
+                } else {
+
+                    active.add(context.getSource());
+                    watingNodes.add(context.getSource());
+
+                }
+                LOG.info("ADDED TO THE ACTIVE LIST NOW IS " + active.toString());
+
+                if (active.size() == 3) {
+                    groups.put(groupCounter, active);
+                    groupCounter++;
+                    active = new HashSet<>();
                 }
             }
-            else {
-
-                active.add(context.getSource());
-
-            }
-            LOG.info("ADDED TO THE ACTIVE LIST NOW IS " + active.toString());
-
-            if (active.size() == 3){
-                groups.put(groupCounter, active);
-                groupCounter++;
-                active = new HashSet<>();
-            }
-
 
         }
     };

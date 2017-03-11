@@ -148,7 +148,7 @@ public class FailureDetector extends ComponentDefinition {
 //*****Functions*****//
 
     private void startHeartbeat(long delay) {
-        timeout = (config().getValue("id2203.project.keepAlivePeriod", Long.class) * 5) + delay;
+        timeout = (config().getValue("id2203.project.keepAlivePeriod", Long.class) * 1) + delay;
         LOG.info("TIMEOUT IN FAILUREDETECTOR IS " + timeout + " and delay is " + delay);
         SchedulePeriodicTimeout spt = new SchedulePeriodicTimeout(timeout, timeout);
         spt.setTimeoutEvent(new BSTimeout(spt));

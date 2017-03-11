@@ -34,6 +34,7 @@ import se.sics.kompics.network.Address;
 import se.sics.kompics.simulator.SimulationScenario;
 import se.sics.kompics.simulator.adaptor.Operation1;
 import se.sics.kompics.simulator.adaptor.distributions.extra.BasicIntSequentialDistribution;
+import se.sics.kompics.simulator.events.system.KillNodeEvent;
 import se.sics.kompics.simulator.events.system.StartNodeEvent;
 
 /**
@@ -53,6 +54,56 @@ public abstract class ScenarioGen {
                 {
                     try {
                         selfAdr = new NetAddress(InetAddress.getByName("192.168.0." + self), 45678);
+                        bsAdr = new NetAddress(InetAddress.getByName("192.168.0.1"), 45678);
+                    } catch (UnknownHostException ex) {
+                        throw new RuntimeException(ex);
+                    }
+                }
+
+                @Override
+                public Address getNodeAddress() {
+                    return selfAdr;
+                }
+
+                @Override
+                public Class getComponentDefinition() {
+                    return ParentComponent.class;
+                }
+
+                @Override
+                public String toString() {
+                    return "StartNode<" + selfAdr.toString() + ">";
+                }
+
+                @Override
+                public Init getComponentInit() {
+                    return Init.NONE;
+                }
+
+                @Override
+                public Map<String, Object> initConfigUpdate() {
+                    HashMap<String, Object> config = new HashMap<>();
+                    config.put("id2203.project.address", selfAdr);
+                    if (self != 1) { // don't put this at the bootstrap server, or it will act as a bootstrap client
+                        config.put("id2203.project.bootstrap-address", bsAdr);
+                    }
+                    return config;
+                }
+            };
+        }
+    };
+
+    private static final Operation1 startServerDoomed = new Operation1<StartNodeEvent, Integer>() {
+
+        @Override
+        public StartNodeEvent generate(final Integer self) {
+            return new StartNodeEvent() {
+                final NetAddress selfAdr;
+                final NetAddress bsAdr;
+
+                {
+                    try {
+                        selfAdr = new NetAddress(InetAddress.getByName("192.168.0."+ 25), 45678);
                         bsAdr = new NetAddress(InetAddress.getByName("192.168.0.1"), 45678);
                     } catch (UnknownHostException ex) {
                         throw new RuntimeException(ex);
@@ -116,7 +167,7 @@ public abstract class ScenarioGen {
 
                 @Override
                 public Class getComponentDefinition() {
-                    return ScenarioClient.class;
+                    return PutTest.class;
                 }
 
                 @Override
@@ -164,7 +215,7 @@ public abstract class ScenarioGen {
 
                 @Override
                 public Class getComponentDefinition() {
-                    return ScenarioClient2.class;
+                    return GetTest.class;
                 }
 
                 @Override
@@ -212,7 +263,7 @@ public abstract class ScenarioGen {
 
                 @Override
                 public Class getComponentDefinition() {
-                    return ScenarioClient3.class;
+                    return CasTest.class;
                 }
 
                 @Override
@@ -231,6 +282,33 @@ public abstract class ScenarioGen {
                     config.put("id2203.project.address", selfAdr);
                     config.put("id2203.project.bootstrap-address", bsAdr);
                     return config;
+                }
+            };
+        }
+    };
+
+    static Operation1 killNodeOp = new Operation1<KillNodeEvent, Integer>() {
+        @Override
+        public KillNodeEvent generate(final Integer self) {
+            return new KillNodeEvent() {
+                final NetAddress selfAdr;
+
+                {
+                    try {
+                        selfAdr = new NetAddress(InetAddress.getByName("192.168.0." + self), 45678);
+                    } catch (UnknownHostException ex) {
+                        throw new RuntimeException(ex);
+                    }
+                }
+
+                @Override
+                public Address getNodeAddress() {
+                    return selfAdr;
+                }
+
+                @Override
+                public String toString() {
+                    return "KillPonger<" + selfAdr.toString() + ">";
                 }
             };
         }
@@ -274,12 +352,20 @@ public abstract class ScenarioGen {
                     }
                 };
 
+                SimulationScenario.StochasticProcess killNode = new SimulationScenario.StochasticProcess() {
+                    {
+                        eventInterArrivalTime(constant(1000));
+                        raise(1, killNodeOp, new BasicIntSequentialDistribution(5));
+                    }
+                };
+
                 startCluster.start();
-                startClients.startAfterTerminationOf(40000, startCluster);
+                killNode.startAfterTerminationOf(20000, startCluster);
+                startClients.startAfterTerminationOf(25000, killNode);
                 startClients2.startAfterTerminationOf(25000, startClients);
                 startClients3.startAfterTerminationOf(25000, startClients2);
                 startClients4.startAfterTerminationOf(25000, startClients3);
-                terminateAfterTerminationOf(100000, startClients);
+                terminateAfterTerminationOf(200000, startClients4);
             }
         };
     }
